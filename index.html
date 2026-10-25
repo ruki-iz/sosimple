@@ -1339,6 +1339,52 @@ font-size: 14px;
         .modal-btn.danger:hover { background-color: #c82333; }
         .empty-msg { text-align: center; color: var(--text-muted); font-style: italic; }
         .search-row { display: flex; align-items: center; gap: 6px; margin: 0 6px 8px 6px; }
+        /* переключатель вида списка: список / календарь */
+        .view-toggle { display: flex; justify-content: flex-end; gap: 4px; margin: 0 6px 6px 0; }
+        .view-toggle button {
+            background: none; border: none; cursor: pointer; opacity: 0.45;
+            color: var(--text-primary); padding: 4px; border-radius: 6px;
+            width: 32px; height: 28px; display: inline-flex; align-items: center;
+            justify-content: center; transition: opacity 0.2s, background 0.2s;
+        }
+        .view-toggle button:hover { opacity: 1; background: var(--accent-black-hover); }
+        .view-toggle button.selected { opacity: 1; color: var(--accent-primary); background: var(--accent-primary-bg); }
+        .tasks-calendar { padding: 0 6px 8px 6px; }
+        .cal-head { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 6px; }
+        .cal-title { font-size: 14px; font-weight: 600; color: var(--text-primary); text-transform: capitalize; min-width: 130px; text-align: center; user-select: none; -webkit-user-select: none; }
+        .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+        .cal-weekday { text-align: center; font-size: 11px; color: var(--text-muted); font-weight: 600; padding: 2px 0; text-transform: capitalize; }
+        .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .cal-cell {
+            aspect-ratio: 1 / 0.9; min-height: 44px;
+            display: flex; flex-direction: column; align-items: center;
+            padding: 3px 0 2px; border-radius: 8px; cursor: pointer;
+            border: 1.5px solid transparent; transition: background 0.15s;
+        }
+        .cal-cell:hover { background: var(--accent-black-hover); }
+        .cal-num { font-size: 12px; color: var(--text-primary); line-height: 1.2; }
+        .cal-cell.other-month .cal-num { color: var(--text-other-month); }
+        .cal-cell.other-month { cursor: default; }
+        .cal-cell.other-month:hover { background: none; }
+        .cal-cell.today .cal-num { font-weight: 700; color: var(--bg-calendar-today-text); }
+        .cal-cell.selected { border-color: var(--accent-primary); background: var(--accent-primary-bg); }
+        .cal-dots { display: flex; gap: 3px; margin-top: 3px; flex-wrap: wrap; justify-content: center; max-width: 100%; padding: 0 2px; }
+        .cal-dot { width: 7px; height: 7px; border-radius: 50%; }
+        /* вхождение напоминания — «пончик» с светлой серединой */
+        .cal-dot.repeat { box-shadow: inset 0 0 0 1.5px var(--bg-panel); }
+        .cal-more { font-size: 9px; color: var(--text-muted); line-height: 1; margin-top: 2px; }
+        .cal-footer { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .cal-frow {
+            font-size: 12px; color: var(--text-secondary); cursor: pointer;
+            padding: 3px 6px; border-radius: 4px; display: flex; align-items: center; gap: 6px;
+            transition: background 0.15s;
+        }
+        .cal-frow:hover { background: var(--accent-black-hover); }
+        .cal-frow.overdue { color: var(--text-danger); }
+        .cal-frow.due { color: var(--accent-primary); }
+        .cal-frow.selected-row { background: var(--accent-primary-bg); color: var(--accent-primary); font-weight: 600; }
+        .cal-frow .cal-reset { margin-left: auto; padding: 0 4px; border-radius: 4px; font-weight: 400; }
+        .cal-frow .cal-reset:hover { background: var(--accent-black-hover); }
         #completedSearchRow, #trashSearchRow { margin-top: -8px; }
         /* строка поиска поднята на 8px — компенсируем, чтобы палитра не прилипала к полю */
         #completedFilterPalette { margin-bottom: 16px; }
@@ -1567,6 +1613,21 @@ font-size: 14px;
     </div>
 
     <div class="panel panel-tasks">
+        <div class="view-toggle">
+            <button id="listViewBtn" title="Список" aria-label="Список"></button>
+            <button id="calendarViewBtn" title="Календарь" aria-label="Календарь"></button>
+        </div>
+        <div class="tasks-calendar" id="tasksCalendar" style="display: none;">
+            <div class="cal-head">
+                <button class="calendar-nav-btn" id="calTasksPrev" tabindex="-1">‹</button>
+                <span class="cal-title" id="calTasksTitle"></span>
+                <button class="calendar-nav-btn" id="calTasksToday" title="Сегодня" tabindex="-1">•</button>
+                <button class="calendar-nav-btn" id="calTasksNext" tabindex="-1">›</button>
+            </div>
+            <div class="cal-weekdays" id="calTasksWeekdays"></div>
+            <div class="cal-days" id="calTasksDays"></div>
+            <div class="cal-footer" id="calTasksFooter"></div>
+        </div>
         <div class="color-palette filter-palette" id="activeFilterPalette" style="display: none;"></div>
         <div class="search-row" id="searchRow" style="display: none;">
             <input type="text" id="searchInput" placeholder="Поиск по задачам…" inputmode="search" enterkeyhint="search">
@@ -1880,6 +1941,9 @@ font-size: 14px;
         const trashSearchClearBtn = document.getElementById('trashSearchClearBtn');
         const trashSearchEmptyMsg = document.getElementById('trashSearchEmptyMsg');
         const completedSortRow = document.getElementById('completedSortRow');
+        const listViewBtn = document.getElementById('listViewBtn');
+        const calendarViewBtn = document.getElementById('calendarViewBtn');
+        const tasksCalendar = document.getElementById('tasksCalendar');
 
         let draggedElement = null;
         let currentEditingTask = null;
@@ -1909,6 +1973,9 @@ font-size: 14px;
         let currentNewTaskColor = null;
         let activeColorFilter = null;
         let completedColorFilter = null;
+        let calMonth = (function () { const d = new Date(); d.setDate(1); return d; })();
+        let calendarDayFilter = null;
+        let quickAddFromCalendar = false;
         let expandedTasks = new WeakSet();       // развёрнутые свёрнутые-задачи (слабые ссылки)
         let resizeTimer = null;                  // дебаунс обработчика resize
         const DEFAULT_MAX_TASK_LENGTH = 350;
@@ -1969,6 +2036,8 @@ font-size: 14px;
         const PIN_SVG = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></svg>';
         const CHEVRON_SVG = '<svg width="14px" height="14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"></polyline></svg>';
         const REPEAT_ICON_SVG = '<svg width="0.8em" height="0.8em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>';
+        const LIST_ICON_SVG = '<svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="3.5" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.3" fill="currentColor" stroke="none"/><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/></svg>';
+        const CAL_ICON_SVG = '<svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><circle cx="8" cy="13.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="13.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="13.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="17.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="17.5" r="1.2" fill="currentColor" stroke="none"/></svg>';
         const BACKSPACE_SVG = '<svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>';
 
         // ====================================================================
@@ -2019,6 +2088,10 @@ font-size: 14px;
                 reminderMoveTo: 'Перенос на:', reminderCountLabel: 'Подтверждений:',
                 lastPrefix: 'последний:', missedLabel: 'Пропущено:', missedShort: 'пропущено',
                 timeOne: 'раз', timeFew: 'раза', timeMany: 'раз',
+                viewList: 'Список', viewCalendar: 'Календарь',
+                calToday: 'Сегодня', calNoDate: 'Без даты', calReset: 'Сбросить',
+                calNewTaskHint: 'Новая задача на:',
+                taskOne: 'задача', taskFew: 'задачи', taskMany: 'задач',
                 repeatNone: 'Без повтора', repeatDaily: 'Ежедневно', repeatWeekdays: 'По будням',
                 repeatWeekends: 'По выходным',
                 repeatWeekly: 'Еженедельно', repeatMonthly: 'Ежемесячно', repeatYearly: 'Ежегодно',
@@ -2114,6 +2187,10 @@ collapseTask: 'Свернуть'
                 reminderMoveTo: 'Snooze to:', reminderCountLabel: 'Confirmations:',
                 lastPrefix: 'last:', missedLabel: 'Missed:', missedShort: 'missed',
                 timeOne: 'time', timeFew: 'times', timeMany: 'times',
+                viewList: 'List', viewCalendar: 'Calendar',
+                calToday: 'Today', calNoDate: 'No date', calReset: 'Reset',
+                calNewTaskHint: 'New task on:',
+                taskOne: 'task', taskFew: 'tasks', taskMany: 'tasks',
                 repeatNone: 'No repeat', repeatDaily: 'Daily', repeatWeekdays: 'Weekdays',
                 repeatWeekends: 'Weekends',
                 repeatWeekly: 'Weekly', repeatMonthly: 'Monthly', repeatYearly: 'Yearly',
@@ -2202,8 +2279,9 @@ collapseTask: 'Collapse'
             maxTaskLength: 350,
 taskFontSize: 14,
 theme: 'system',
-collapseActiveTasks: false,
-collapseHeightPx: 120
+            collapseActiveTasks: false,
+            collapseHeightPx: 120,
+            tasksView: 'list'
 };
         let appSettings = { ...defaultSettings };
 
@@ -3158,6 +3236,10 @@ collapseHeightPx: 120
             });
             document.querySelectorAll('#repeatRow [data-label]').forEach(el => { el.textContent = t(el.dataset.label); });
             updateNdaysUnitText();
+            setIconLabel(listViewBtn, t('viewList'));
+            setIconLabel(calendarViewBtn, t('viewCalendar'));
+            document.getElementById('calTasksToday').title = t('calToday');
+            refreshTasksCalendar();
             document.getElementById('syncTitleLabel').textContent = t('syncTitle');
             document.getElementById('syncLoginBtn').textContent = t('syncLogin');
             document.getElementById('syncRegisterBtn').textContent = t('syncRegister');
@@ -3516,6 +3598,7 @@ collapseHeightPx: 120
             initTaskListDelegation();
             initCustomScrollbars();
             initTouchGestures();
+            initTasksCalendar();
             checkAutoTrash();
             checkTrashCleanup();
             updateBadges();
@@ -4225,6 +4308,263 @@ collapseHeightPx: 120
             const r = fixed[fixed.length - 1].getBoundingClientRect();
             // полностью видна именно в кадре: уехала выше экрана — вверх тянуть ещё нужно
             return r.top >= 0 && r.bottom <= window.innerHeight - 2;
+        }
+
+        // ====================================================================
+        //  Вид «Календарь» активных задач: месячная сетка с точками задач,
+        //  вхождениями напоминаний и фильтром списка по выбранному дню
+        // ====================================================================
+
+        // подходит ли задача под текущий календарный фильтр
+        function calendarMatches(li, filter) {
+            const chip = li.querySelector('.deadline-display');
+            const dlStr = chip ? chip.dataset.deadline : null;
+            if (filter.type === 'nodate') return !chip;
+            const repeat = parseRepeatRule(li.dataset.repeat);
+            if (filter.type === 'overdue') return !!dlStr && !repeat && new Date(dlStr) <= new Date();
+            if (filter.type === 'due') return !!dlStr && !!repeat && new Date(dlStr) <= new Date();
+            if (filter.type === 'day') {
+                if (!dlStr) return false;
+                const dl = new Date(dlStr);
+                if (isNaN(dl.getTime())) return false;
+                if (dl.getFullYear() === filter.y && dl.getMonth() === filter.m && dl.getDate() === filter.d) return true;
+                if (repeat) {
+                    // день совпадает с одним из вхождений правила повтора
+                    const target = new Date(filter.y, filter.m, filter.d);
+                    let cur = new Date(dl.getTime());
+                    let guard = 0;
+                    while (cur < target && guard < 500) { cur = nextRepeatDate(cur, repeat); guard++; }
+                    return cur.getFullYear() === filter.y && cur.getMonth() === filter.m && cur.getDate() === filter.d;
+                }
+                return false;
+            }
+            return true;
+        }
+
+        // собрать все привязки к датам видимого месяца: дедлайны + вхождения напоминаний
+        function collectCalendarItems(monthStart, monthEnd) {
+            const map = {};
+            const push = (d, color, repeat) => {
+                const k = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+                (map[k] = map[k] || []).push({ color: color, repeat: repeat });
+            };
+            document.querySelectorAll('#taskList li').forEach(li => {
+                const chip = li.querySelector('.deadline-display');
+                if (!chip || !chip.dataset.deadline) return;
+                const color = li.getAttribute('data-color') || 'none';
+                const repeat = parseRepeatRule(li.dataset.repeat);
+                let cur = new Date(chip.dataset.deadline);
+                if (isNaN(cur.getTime())) return;
+                let guard = 0;
+                if (!repeat) {
+                    if (cur >= monthStart && cur <= monthEnd) push(cur, color, false);
+                } else {
+                    while (cur < monthStart && guard < 500) { cur = nextRepeatDate(cur, repeat); guard++; }
+                    while (cur <= monthEnd && guard < 500) {
+                        if (cur >= monthStart) push(cur, color, true);
+                        cur = nextRepeatDate(cur, repeat); guard++;
+                    }
+                }
+            });
+            return map;
+        }
+
+        function renderCalFooter() {
+            const foot = document.getElementById('calTasksFooter');
+            if (!foot) return;
+            foot.innerHTML = '';
+            const addRow = (cls, text, onClick) => {
+                const r = document.createElement('div');
+                r.className = 'cal-frow ' + cls;
+                r.textContent = text;
+                r.addEventListener('click', onClick);
+                foot.appendChild(r);
+                return r;
+            };
+            if (calendarDayFilter) {
+                let label;
+                if (calendarDayFilter.type === 'day') {
+                    const d = new Date(calendarDayFilter.y, calendarDayFilter.m, calendarDayFilter.d);
+                    label = d.toLocaleDateString(localeStr(), { weekday: 'long', day: 'numeric', month: 'long' });
+                } else if (calendarDayFilter.type === 'overdue') label = t('overdue');
+                else if (calendarDayFilter.type === 'due') label = t('reminderDue');
+                else label = t('calNoDate');
+                const n = Array.from(taskList.children).filter(li => calendarMatches(li, calendarDayFilter)).length;
+                const row = addRow('selected-row', label + ' · ' + n + ' ' + formatUnitCount(n, 'task'), () => {});
+                const x = document.createElement('span');
+                x.className = 'cal-reset';
+                x.textContent = '✕';
+                x.title = t('calReset');
+                x.addEventListener('click', ev => { ev.stopPropagation(); setCalendarFilter(null); });
+                row.appendChild(x);
+                return;
+            }
+            let over = 0, due = 0, nodate = 0;
+            Array.from(taskList.children).forEach(li => {
+                const chip = li.querySelector('.deadline-display');
+                if (!chip) { nodate++; return; }
+                const repeat = parseRepeatRule(li.dataset.repeat);
+                if (new Date(chip.dataset.deadline) <= new Date()) { if (repeat) due++; else over++; }
+            });
+            if (over) addRow('overdue', t('overdue') + ': ' + over, () => setCalendarFilter({ type: 'overdue' }));
+            if (due) addRow('due', t('reminderDue') + ': ' + due, () => setCalendarFilter({ type: 'due' }));
+            if (nodate) addRow('', t('calNoDate') + ': ' + nodate, () => setCalendarFilter({ type: 'nodate' }));
+            if (quickAddFromCalendar && pendingDeadline) {
+                const row = addRow('', t('calNewTaskHint') + ' ' + formatShortDateTime(new Date(pendingDeadline)), () => focusTaskInput());
+                const x = document.createElement('span');
+                x.className = 'cal-reset';
+                x.textContent = '✕';
+                x.addEventListener('click', ev => {
+                    ev.stopPropagation();
+                    pendingDeadline = null;
+                    pendingRepeat = null;
+                    quickAddFromCalendar = false;
+                    updatePendingDeadlineButton();
+                    renderCalFooter();
+                });
+                row.appendChild(x);
+            }
+        }
+
+        function renderTasksCalendar() {
+            if (!tasksCalendar || appSettings.tasksView !== 'calendar') return;
+            const locale = localeStr();
+            const y = calMonth.getFullYear(), m = calMonth.getMonth();
+            document.getElementById('calTasksTitle').textContent = calMonth.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+            const wd = [];
+            const monday = new Date(2024, 0, 1);
+            for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(monday.getDate() + i); wd.push(d.toLocaleDateString(locale, { weekday: 'narrow' })); }
+            document.getElementById('calTasksWeekdays').innerHTML = wd.map(x => '<div class="cal-weekday">' + x + '</div>').join('');
+
+            const monthStart = new Date(y, m, 1);
+            const monthEnd = new Date(y, m + 1, 0, 23, 59, 59);
+            const items = collectCalendarItems(monthStart, monthEnd);
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            let off = monthStart.getDay() - 1; if (off < 0) off = 6;
+            const daysInMonth = monthEnd.getDate();
+            const daysPrev = new Date(y, m, 0).getDate();
+            const grid = document.getElementById('calTasksDays');
+            grid.innerHTML = '';
+            for (let i = 0; i < 42; i++) {
+                let dayNum, cellDate, other = false;
+                if (i < off) { dayNum = daysPrev - off + i + 1; cellDate = new Date(y, m - 1, dayNum); other = true; }
+                else if (i >= off + daysInMonth) { dayNum = i - off - daysInMonth + 1; cellDate = new Date(y, m + 1, dayNum); other = true; }
+                else { dayNum = i - off + 1; cellDate = new Date(y, m, dayNum); }
+                const cell = document.createElement('div');
+                cell.className = 'cal-cell';
+                if (other) cell.classList.add('other-month');
+                if (calendarDayFilter && calendarDayFilter.type === 'day' &&
+                    calendarDayFilter.y === cellDate.getFullYear() &&
+                    calendarDayFilter.m === cellDate.getMonth() &&
+                    calendarDayFilter.d === cellDate.getDate()) cell.classList.add('selected');
+                if (cellDate.getTime() === today.getTime()) cell.classList.add('today');
+                const num = document.createElement('span');
+                num.className = 'cal-num';
+                num.textContent = dayNum;
+                cell.appendChild(num);
+                if (!other) {
+                    cell.dataset.y = cellDate.getFullYear();
+                    cell.dataset.m = cellDate.getMonth();
+                    cell.dataset.d = cellDate.getDate();
+                    const list = items[cellDate.getFullYear() + '-' + cellDate.getMonth() + '-' + cellDate.getDate()] || [];
+                    if (list.length) {
+                        const dots = document.createElement('span');
+                        dots.className = 'cal-dots';
+                        for (let k = 0; k < Math.min(list.length, 3); k++) {
+                            const dot = document.createElement('span');
+                            dot.className = 'cal-dot' + (list[k].repeat ? ' repeat' : '');
+                            dot.style.background = 'var(--task-color-' + list[k].color + ')';
+                            dots.appendChild(dot);
+                        }
+                        cell.appendChild(dots);
+                        if (list.length > 3) {
+                            const more = document.createElement('span');
+                            more.className = 'cal-more';
+                            more.textContent = '+' + (list.length - 3);
+                            cell.appendChild(more);
+                        }
+                    }
+                }
+                grid.appendChild(cell);
+            }
+            renderCalFooter();
+        }
+
+        function refreshTasksCalendar() {
+            if (appSettings.tasksView === 'calendar') renderTasksCalendar();
+        }
+
+        function setCalendarFilter(f) {
+            calendarDayFilter = f;
+            if (f && searchRow.style.display !== 'none') setSearchOpen(false);
+            else updateEmptyMsg();
+        }
+
+        function updateTasksViewUI() {
+            const cal = appSettings.tasksView === 'calendar';
+            listViewBtn.classList.toggle('selected', !cal);
+            calendarViewBtn.classList.toggle('selected', cal);
+            tasksCalendar.style.display = cal ? '' : 'none';
+        }
+
+        function setTasksView(mode) {
+            if (appSettings.tasksView === mode) return;
+            appSettings.tasksView = mode;
+            saveSettings();
+            updateTasksViewUI();
+            if (mode === 'calendar') {
+                const d = new Date(); d.setDate(1);
+                calMonth = d;
+                renderTasksCalendar();
+            } else {
+                setCalendarFilter(null);
+            }
+            updateEmptyMsg();
+        }
+
+        function initTasksCalendar() {
+            listViewBtn.innerHTML = LIST_ICON_SVG;
+            calendarViewBtn.innerHTML = CAL_ICON_SVG;
+            listViewBtn.addEventListener('click', () => setTasksView('list'));
+            calendarViewBtn.addEventListener('click', () => setTasksView('calendar'));
+            document.getElementById('calTasksPrev').addEventListener('click', () => {
+                calMonth.setMonth(calMonth.getMonth() - 1);
+                renderTasksCalendar();
+            });
+            document.getElementById('calTasksNext').addEventListener('click', () => {
+                calMonth.setMonth(calMonth.getMonth() + 1);
+                renderTasksCalendar();
+            });
+            document.getElementById('calTasksToday').addEventListener('click', () => {
+                const d = new Date(); d.setDate(1);
+                calMonth = d;
+                renderTasksCalendar();
+            });
+            document.getElementById('calTasksDays').addEventListener('click', e => {
+                const cell = e.target.closest('.cal-cell');
+                if (!cell || cell.classList.contains('other-month') || !cell.dataset.y) return;
+                const y = +cell.dataset.y, m = +cell.dataset.m, d = +cell.dataset.d;
+                if (calendarDayFilter && calendarDayFilter.type === 'day' &&
+                    calendarDayFilter.y === y && calendarDayFilter.m === m && calendarDayFilter.d === d) {
+                    setCalendarFilter(null);
+                    return;
+                }
+                const has = Array.from(taskList.children).some(li => calendarMatches(li, { type: 'day', y: y, m: m, d: d }));
+                if (has) { setCalendarFilter({ type: 'day', y: y, m: m, d: d }); return; }
+                // пустой день: подставляем дату как дедлайн новой задачи
+                const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+                if (new Date(y, m, d) < today0) return;
+                const date = new Date(y, m, d, 23, 59, 0);
+                if (date <= new Date()) return;
+                pendingDeadline = date.toISOString();
+                pendingRepeat = null;
+                quickAddFromCalendar = true;
+                updatePendingDeadlineButton();
+                renderCalFooter();
+                focusTaskInput();
+            });
+            updateTasksViewUI();
+            if (appSettings.tasksView === 'calendar') renderTasksCalendar();
         }
 
         function initTaskListDelegation() {
@@ -5418,6 +5758,7 @@ collapseHeightPx: 120
             updateCharCounter(taskInput, document.getElementById('taskInputCounter'));
             pendingDeadline = null;
             pendingRepeat = null;
+            quickAddFromCalendar = false;
             updatePendingDeadlineButton();
             saveTasks();
             updateEmptyMsg();
@@ -5806,23 +6147,26 @@ collapseHeightPx: 120
             noResultsEl.style.display = (active && shown === 0 && total > 0) ? 'block' : 'none';
         }
 
-        // фильтр активных задач: текст + цветовая метка (объединяются по И)
+        // фильтр активных задач: текст + цветовая метка + день календаря (по И)
         function applySearch() {
             const q = searchInput.value.trim().toLowerCase();
             const color = activeColorFilter;
-            const active = q !== '' || color !== null;
+            const cal = calendarDayFilter;
+            const active = q !== '' || color !== null || cal !== null;
             let shown = 0, total = 0;
             document.querySelectorAll('#taskList li').forEach(li => {
                 total++;
                 const textEl = li.querySelector('.task-text');
                 const textMatch = !q || ((textEl ? textEl.textContent : '').toLowerCase().includes(q));
                 const liColor = li.getAttribute('data-color') || 'none';
-                const match = textMatch && (color === null || liColor === color);
+                let match = textMatch && (color === null || liColor === color);
+                if (match && cal) match = calendarMatches(li, cal);
                 li.classList.toggle('search-hidden', !match);
                 if (match) shown++;
             });
             taskList.classList.toggle('search-active', active);
-            searchCount.textContent = active ? shown + ' / ' + total : '';
+            const searching = q !== '' || color !== null;
+            searchCount.textContent = searching ? shown + ' / ' + total : '';
             searchEmptyMsg.style.display = (active && shown === 0 && total > 0) ? 'block' : 'none';
             if (updateFilterPalettes()) applySearch();
         }
@@ -5897,6 +6241,11 @@ collapseHeightPx: 120
         // открыть/закрыть строку поиска активных задач (с очисткой фильтров)
         function setSearchOpen(open) {
             searchRow.style.display = open ? 'flex' : 'none';
+            if (open && calendarDayFilter) {
+                // поиск и день календаря не смешиваем
+                calendarDayFilter = null;
+                refreshTasksCalendar();
+            }
             if (!open) {
                 if (searchInput.value !== '') searchInput.value = '';
                 if (activeColorFilter !== null) {
@@ -6051,9 +6400,10 @@ collapseHeightPx: 120
             const newTitle = c > 0 ? `(${c}) ${t('pageTitle')}` : t('pageTitle');
             originalTitle = newTitle;
             if (!titleBlinking) document.title = newTitle;
-            applySearch();
-            updateTailSpace();
-        }
+    applySearch();
+    updateTailSpace();
+    refreshTasksCalendar();
+}
 
         function updateBadges() {
             const cc = completedList.children.length;
