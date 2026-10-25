@@ -2051,7 +2051,8 @@ font-size: 14px;
                 addedFullPrefix: 'Добавлено:', editedPrefix: 'Изменено:', tookPrefix: 'Заняло:', completedPrefix: 'Выполнено:',
                 deletedPrefix: 'Удалено:', deadlinePrefix: 'Дедлайн:',
                 deadlineRemaining: 'До дедлайна:', deadlineOverdue: 'Просрочено на:',
-                overdue: 'Просрочено', inTime: 'осталось', tomorrow: 'завтра',
+                overdue: 'Просрочено', inTime: 'через', tomorrow: 'завтра', dayAfterTomorrow: 'послезавтра',
+                inWeek: 'неделю',
                 justNow: 'только что', minAgo: 'мин назад', hoursAgo: 'ч назад', yesterday: 'вчера', daysAgo: 'дн назад',
                 minShort: 'мин', hoursShort: 'ч', daysShort: 'дн.', lessMinute: 'менее минуты',
                 setDeadline: 'Установить дедлайн', changeDeadlineChip: 'Нажмите, чтобы изменить дедлайн', openCalendar: 'Открыть календарь',
@@ -2145,7 +2146,8 @@ collapseTask: 'Свернуть'
                 addedFullPrefix: 'Added:', editedPrefix: 'Edited:', tookPrefix: 'Took:', completedPrefix: 'Completed:',
                 deletedPrefix: 'Deleted:', deadlinePrefix: 'Deadline:',
                 deadlineRemaining: 'Time to deadline:', deadlineOverdue: 'Overdue by:',
-                overdue: 'Overdue', inTime: 'left', tomorrow: 'tomorrow',
+                overdue: 'Overdue', inTime: 'in', tomorrow: 'tomorrow', dayAfterTomorrow: 'in 2 days',
+                inWeek: 'a week',
                 justNow: 'just now', minAgo: 'min ago', hoursAgo: 'h ago', yesterday: 'yesterday', daysAgo: 'days ago',
                 minShort: 'min', hoursShort: 'h', daysShort: 'd', lessMinute: 'less than a minute',
                 setDeadline: 'Set deadline', changeDeadlineChip: 'Click to change deadline', openCalendar: 'Open calendar',
@@ -4829,6 +4831,10 @@ collapseHeightPx: 120
                         setPickerDate(parseInt(this.dataset.year, 10), parseInt(this.dataset.month, 10), parseInt(this.dataset.day, 10));
                         updatePickerDisplay();
                         closeCalendar();
+                        // дата выбрана — дальше вводят время: фокус на часы
+                        const hi = document.getElementById('hourInput');
+                        hi.focus();
+                        focusYearField('hour', hi);
                     });
                 });
                 const prevMonthStart = new Date(year, month - 1, 1);
@@ -5355,19 +5361,24 @@ collapseHeightPx: 120
         function formatDeadlineShort(d, isReminder) {
             if (isNaN(d.getTime())) return '';
             const ms = d - new Date();
-            const h = ms / 3600000;
-            const dy = Math.floor(h / 24);
             if (ms < 0) return isReminder ? t('reminderDue') : t('overdue');
-            if (h < 1) return `${t('inTime')} ${Math.floor(ms / 60000)} ${t('minShort')}`;
-            if (h < 24) return `${t('inTime')} ${Math.floor(h)} ${t('hoursShort')}`;
-            if (dy === 1) return t('tomorrow');
-            if (dy < 7) return `${t('inTime')} ${dy} ${t('daysShort')}`;
-            const currentYear = new Date().getFullYear();
-            if (d.getFullYear() !== currentYear) {
+            // календарная разница дней (не полные 24-часовые периоды):
+            // завтра, послезавтра, через 3 дня — даже если это неполные 72 часа
+            const startNow = new Date(); startNow.setHours(0, 0, 0, 0);
+            const startD = new Date(d); startD.setHours(0, 0, 0, 0);
+            const dayDiff = Math.round((startD - startNow) / 86400000);
+            if (dayDiff === 1) return t('tomorrow');
+            if (dayDiff === 2) return t('dayAfterTomorrow');
+            if (dayDiff > 2 && dayDiff < 7) return `${t('inTime')} ${dayDiff} ${formatUnitCount(dayDiff, 'day')}`;
+            if (dayDiff === 7) return `${t('inTime')} ${t('inWeek')}`;
+            if (dayDiff > 7) {
+                const currentYear = new Date().getFullYear();
                 const dayMonth = d.toLocaleDateString(localeStr(), { day: 'numeric', month: 'short' });
-                return `${dayMonth} ${d.getFullYear()}`;
+                return d.getFullYear() !== currentYear ? `${dayMonth} ${d.getFullYear()}` : dayMonth;
             }
-            return d.toLocaleDateString(localeStr(), { day: 'numeric', month: 'short' });
+            // тот же календарный день: часы и минуты
+            if (ms >= 3600000) return `${t('inTime')} ${Math.floor(ms / 3600000)} ${t('hoursShort')}`;
+            return `${t('inTime')} ${Math.floor(ms / 60000)} ${t('minShort')}`;
         }
 
         function addTask() {
@@ -5433,7 +5444,7 @@ collapseHeightPx: 120
                     // Относительное время показываем только в пределах недели.
                     // Дальше formatDeadlineShort() вернул бы опять дату — она уже есть слева.
                     // Для просроченного дедлайна здесь будет «Просрочено».
-                    if (msLeft < 7 * 86400000) {
+                    if (msLeft <= 7 * 86400000) {
                         newHtml += ' <span class="deadline-time">' + formatDeadlineShort(deadline) + '</span>';
                     }
                 }
@@ -6308,7 +6319,7 @@ collapseHeightPx: 120
                 el.appendChild(text);
                 el.appendChild(icon);
                 const msLeft = new Date(ds) - new Date();
-                if (msLeft > 0 && msLeft < 7 * 86400000) {
+                if (msLeft > 0 && msLeft <= 7 * 86400000) {
                     const rel = document.createElement('span');
                     rel.classList.add('deadline-relative');
                     rel.textContent = formatDeadlineShort(new Date(ds), true);
@@ -6680,7 +6691,7 @@ collapseHeightPx: 120
                 const relEl = el.querySelector('.deadline-relative');
                 if (!relEl) return;
                 const msLeft = new Date(el.dataset.deadline) - new Date();
-                if (msLeft > 0 && msLeft < 7 * 86400000) {
+                if (msLeft > 0 && msLeft <= 7 * 86400000) {
                     const newText2 = formatDeadlineShort(new Date(el.dataset.deadline), true);
                     if (relEl.textContent !== newText2) relEl.textContent = newText2;
                     relEl.style.display = '';
