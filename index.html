@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Мои задачи</title>
+    <meta name="theme-color" content="#007bff">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <style>
         :root {
             color-scheme: light;
@@ -333,6 +336,9 @@
         .input-wrapper:focus-within {
             border-color: var(--border-focus);
         }
+        /* у новой задачи с повтором индикатор метки — на правом краю поля */
+        .input-wrapper.repeat-pending { flex-direction: row-reverse; }
+        .input-wrapper.repeat-pending .input-color-indicator { border-radius: 0 5px 5px 0; }
         .input-wrapper:has(#taskInput.error) {
             border-color: var(--text-danger);
             background-color: var(--bg-input-error);
@@ -405,6 +411,7 @@
             display: flex;
             align-items: flex-start;
             border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
             background-image: linear-gradient(
                 var(--task-label-color, var(--task-color-none)),
                 var(--task-label-color, var(--task-color-none))
@@ -777,7 +784,7 @@
     font-size: 11px;
     color: var(--text-muted);
     font-style: italic;
-    cursor: help;
+    cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
@@ -1340,7 +1347,7 @@ font-size: 14px;
         .empty-msg { text-align: center; color: var(--text-muted); font-style: italic; }
         .search-row { display: flex; align-items: center; gap: 6px; margin: 0 6px 8px 6px; }
         /* переключатель вида списка: список / календарь */
-        .view-toggle { display: flex; justify-content: flex-end; gap: 4px; margin: 0 6px 6px 0; }
+        .view-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 4px; margin: 0 6px 6px 0; }
         .view-toggle button {
             background: none; border: none; cursor: pointer; opacity: 0.45;
             color: var(--text-primary); padding: 4px; border-radius: 6px;
@@ -1350,8 +1357,9 @@ font-size: 14px;
         .view-toggle button:hover { opacity: 1; background: var(--accent-black-hover); }
         .view-toggle button.selected { opacity: 1; color: var(--accent-primary); background: var(--accent-primary-bg); }
         .tasks-calendar { padding: 0 6px 8px 6px; }
-        .cal-head { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 6px; }
-        .cal-title { font-size: 14px; font-weight: 600; color: var(--text-primary); text-transform: capitalize; min-width: 130px; text-align: center; user-select: none; -webkit-user-select: none; }
+        /* шапка календаря живёт в строке переключателя вида, справа от кнопок */
+        .cal-head { display: flex; align-items: center; justify-content: center; gap: 4px; margin-left: auto; }
+        .cal-title { font-size: 14px; font-weight: 600; color: var(--text-primary); text-transform: capitalize; min-width: 108px; text-align: center; user-select: none; -webkit-user-select: none; }
         .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
         .cal-weekday { text-align: center; font-size: 11px; color: var(--text-muted); font-weight: 600; padding: 2px 0; text-transform: capitalize; }
         .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
@@ -1364,15 +1372,17 @@ font-size: 14px;
         .cal-cell:hover { background: var(--accent-black-hover); }
         .cal-num { font-size: 12px; color: var(--text-primary); line-height: 1.2; }
         .cal-cell.other-month .cal-num { color: var(--text-other-month); }
-        .cal-cell.other-month { cursor: default; }
-        .cal-cell.other-month:hover { background: none; }
+        .cal-cell.other-month { cursor: pointer; }
         .cal-cell.today .cal-num { font-weight: 700; color: var(--bg-calendar-today-text); }
         .cal-cell.selected { border-color: var(--accent-primary); background: var(--accent-primary-bg); }
         .cal-dots { display: flex; gap: 3px; margin-top: 3px; flex-wrap: wrap; justify-content: center; max-width: 100%; padding: 0 2px; }
-        .cal-dot { width: 7px; height: 7px; border-radius: 50%; }
-        /* вхождение напоминания — «пончик» с светлой серединой */
-        .cal-dot.repeat { box-shadow: inset 0 0 0 1.5px var(--bg-panel); }
-        .cal-more { font-size: 9px; color: var(--text-muted); line-height: 1; margin-top: 2px; }
+        .cal-dot { width: 7px; height: 7px; border-radius: 50%; box-sizing: border-box; }
+        /* вхождение напоминания — «пончик»: кольцо цвета метки, середина под панель */
+        .cal-dot.repeat { width: 9px; height: 9px; background: var(--bg-panel); border: 2.5px solid var(--bg-panel); }
+        /* прошедшие дни приглушены */
+        .cal-cell.cal-past .cal-num { color: var(--text-other-month); }
+        .cal-cell.cal-past .cal-dot { opacity: 0.4; }
+        .cal-more { font-size: 9px; color: var(--text-muted); line-height: 1; margin-left: 2px; align-self: center; }
         .cal-footer { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
         .cal-frow {
             font-size: 12px; color: var(--text-secondary); cursor: pointer;
@@ -1544,6 +1554,7 @@ font-size: 14px;
             /* на тач-устройствах hover «залипает» после тапа и при скролле —
                отключаем все hover-эффекты, связанные со свёрнутыми задачами */
             .task-text:hover { background-color: transparent; }
+            .task-date:hover { color: var(--text-muted); }
             .collapse-toggle:hover { color: var(--text-muted); background-color: transparent; }
             .reminder-stats:hover { color: var(--text-muted); }
             /* тач: «залипший» hover кнопок карточек не подсвечивает */
@@ -1616,14 +1627,14 @@ font-size: 14px;
         <div class="view-toggle">
             <button id="listViewBtn" title="Список" aria-label="Список"></button>
             <button id="calendarViewBtn" title="Календарь" aria-label="Календарь"></button>
-        </div>
-        <div class="tasks-calendar" id="tasksCalendar" style="display: none;">
-            <div class="cal-head">
+            <div class="cal-head" id="calTasksHead">
                 <button class="calendar-nav-btn" id="calTasksPrev" tabindex="-1">‹</button>
                 <span class="cal-title" id="calTasksTitle"></span>
                 <button class="calendar-nav-btn" id="calTasksToday" title="Сегодня" tabindex="-1">•</button>
                 <button class="calendar-nav-btn" id="calTasksNext" tabindex="-1">›</button>
             </div>
+        </div>
+        <div class="tasks-calendar" id="tasksCalendar" style="display: none;">
             <div class="cal-weekdays" id="calTasksWeekdays"></div>
             <div class="cal-days" id="calTasksDays"></div>
             <div class="cal-footer" id="calTasksFooter"></div>
@@ -1842,6 +1853,13 @@ font-size: 14px;
                     <option value="180" id="deadlineAlert3hours">3 часа</option>
                 </select>
             </div>
+            <div class="settings-group">
+                <div>
+                    <label for="settingAutoConfirm" id="autoConfirmLabel">Автоматически подтверждать напоминания</label>
+                    <div class="settings-hint" id="autoConfirmHint">по наступлении срока переносить на следующую дату</div>
+                </div>
+                <input type="checkbox" id="settingAutoConfirm">
+            </div>
             <div class="settings-group settings-backup">
                 <label>Резервное копирование</label>
                 <div class="backup-buttons">
@@ -1911,6 +1929,7 @@ font-size: 14px;
         const settingTheme = document.getElementById('settingTheme');
         const settingRelativeTime = document.getElementById('settingRelativeTime');
         const settingNewTaskOnTop = document.getElementById('settingNewTaskOnTop');
+        const settingAutoConfirm = document.getElementById('settingAutoConfirm');
         const newTaskPositionBtn = document.getElementById('newTaskPositionBtn');
         const settingLanguage = document.getElementById('settingLanguage');
         const settingDeadlineAlert = document.getElementById('settingDeadlineAlert');
@@ -2054,7 +2073,7 @@ font-size: 14px;
                 emptyList: 'Список пуст. Добавьте первую задачу!',
                 completedTitle: 'Выполненные задачи', noCompleted: 'Нет выполненных задач',
                 trashTitle: 'Корзина', clearTrash: 'Очистить корзину', trashEmpty: 'Корзина пуста',
-                deadlineTitle: 'Установить дедлайн', changeDeadlineTitle: 'Изменить дедлайн',
+                deadlineTitle: 'Установить время', changeDeadlineTitle: 'Изменить время',
                 changeTimeTitle: 'Изменить время',
             invalidDay: 'Такого числа нет в этом месяце',
                 presetToday: 'Сегодня 23:59', presetTomorrow: 'Завтра 12:00', preset3days: '+3 дня', presetWeek: '+Неделя',
@@ -2088,6 +2107,8 @@ font-size: 14px;
                 reminderMoveTo: 'Перенос на:', reminderCountLabel: 'Подтверждений:',
                 lastPrefix: 'последний:', missedLabel: 'Пропущено:', missedShort: 'пропущено',
                 timeOne: 'раз', timeFew: 'раза', timeMany: 'раз',
+                autoConfirm: 'Автоматически подтверждать напоминания',
+                autoConfirmHint: 'по наступлении срока переносить на следующую дату',
                 viewList: 'Список', viewCalendar: 'Календарь',
                 calToday: 'Сегодня', calNoDate: 'Без даты', calReset: 'Сбросить',
                 calNewTaskHint: 'Новая задача на:',
@@ -2128,9 +2149,9 @@ font-size: 14px;
                 inWeek: 'неделю',
                 justNow: 'только что', minAgo: 'мин назад', hoursAgo: 'ч назад', yesterday: 'вчера', daysAgo: 'дн назад',
                 minShort: 'мин', hoursShort: 'ч', daysShort: 'дн.', lessMinute: 'менее минуты',
-                setDeadline: 'Установить дедлайн', changeDeadlineChip: 'Нажмите, чтобы изменить дедлайн', openCalendar: 'Открыть календарь',
+                setDeadline: 'Установить время', changeDeadlineChip: 'Нажмите, чтобы изменить дедлайн', openCalendar: 'Открыть календарь',
                 deadlineAlertLabel: 'Уведомление в заголовке вкладки',
-                deadlineAlertHint: 'Оставшееся время до дедлайна',
+                deadlineAlertHint: 'Оставшееся время',
                 deadlineAlertOff: 'Выключено',
                 deadlineAlert10min: '10 минут',
                 deadlineAlert30min: '30 минут',
@@ -2153,7 +2174,7 @@ collapseTask: 'Свернуть'
                 emptyList: 'List is empty. Add your first task!',
                 completedTitle: 'Completed tasks', noCompleted: 'No completed tasks',
                 trashTitle: 'Trash', clearTrash: 'Empty trash', trashEmpty: 'Trash is empty',
-                deadlineTitle: 'Set deadline', changeDeadlineTitle: 'Change deadline',
+                deadlineTitle: 'Set time', changeDeadlineTitle: 'Change time',
                 changeTimeTitle: 'Change time',
             invalidDay: 'This day does not exist in this month',
                 presetToday: 'Today 23:59', presetTomorrow: 'Tomorrow 12:00', preset3days: '+3 days', presetWeek: '+Week',
@@ -2187,6 +2208,8 @@ collapseTask: 'Свернуть'
                 reminderMoveTo: 'Snooze to:', reminderCountLabel: 'Confirmations:',
                 lastPrefix: 'last:', missedLabel: 'Missed:', missedShort: 'missed',
                 timeOne: 'time', timeFew: 'times', timeMany: 'times',
+                autoConfirm: 'Auto-confirm reminders',
+                autoConfirmHint: 'when due, move to the next date',
                 viewList: 'List', viewCalendar: 'Calendar',
                 calToday: 'Today', calNoDate: 'No date', calReset: 'Reset',
                 calNewTaskHint: 'New task on:',
@@ -2227,9 +2250,9 @@ collapseTask: 'Свернуть'
                 inWeek: 'a week',
                 justNow: 'just now', minAgo: 'min ago', hoursAgo: 'h ago', yesterday: 'yesterday', daysAgo: 'days ago',
                 minShort: 'min', hoursShort: 'h', daysShort: 'd', lessMinute: 'less than a minute',
-                setDeadline: 'Set deadline', changeDeadlineChip: 'Click to change deadline', openCalendar: 'Open calendar',
+                setDeadline: 'Set time', changeDeadlineChip: 'Click to change deadline', openCalendar: 'Open calendar',
                 deadlineAlertLabel: 'Tab title notification',
-                deadlineAlertHint: 'Time remaining until deadline',
+                deadlineAlertHint: 'Time remaining',
                 deadlineAlertOff: 'Disabled',
                 deadlineAlert10min: '10 minutes',
                 deadlineAlert30min: '30 minutes',
@@ -2281,7 +2304,8 @@ taskFontSize: 14,
 theme: 'system',
             collapseActiveTasks: false,
             collapseHeightPx: 120,
-            tasksView: 'list'
+            tasksView: 'list',
+            autoConfirmReminders: false
 };
         let appSettings = { ...defaultSettings };
 
@@ -3236,6 +3260,8 @@ theme: 'system',
             });
             document.querySelectorAll('#repeatRow [data-label]').forEach(el => { el.textContent = t(el.dataset.label); });
             updateNdaysUnitText();
+            document.getElementById('autoConfirmLabel').textContent = t('autoConfirm');
+            document.getElementById('autoConfirmHint').textContent = t('autoConfirmHint');
             setIconLabel(listViewBtn, t('viewList'));
             setIconLabel(calendarViewBtn, t('viewCalendar'));
             document.getElementById('calTasksToday').title = t('calToday');
@@ -3432,6 +3458,7 @@ theme: 'system',
             settingNewTaskOnTop.checked = appSettings.newTaskOnTop;
             settingLanguage.value = appSettings.language || 'ru';
             settingDeadlineAlert.value = appSettings.deadlineAlertMinutes || 0;
+            settingAutoConfirm.checked = !!appSettings.autoConfirmReminders;
             updateNewTaskPositionBtn();
             settingsModal.classList.add('active');
             // при открытии прокрутка всегда сверху
@@ -3545,7 +3572,8 @@ theme: 'system',
             if (dueReminders.length > 0) {
                 const label = dueReminders[0] + (dueReminders.length > 1 ? ' +' + (dueReminders.length - 1) : '');
                 startTitleBlinking('⏰ ' + label);
-            } else if (hasOverdue) {
+            } else if (hasOverdue && threshold > 0) {
+                // просроченные задачи мигают только при включённых уведомлениях
                 startTitleBlinking(`⚠️ ${t('overdue')}`);
             } else if (nearestAlert) {
                 let message;
@@ -3599,6 +3627,7 @@ theme: 'system',
             initCustomScrollbars();
             initTouchGestures();
             initTasksCalendar();
+            autoConfirmDueReminders();
             checkAutoTrash();
             checkTrashCleanup();
             updateBadges();
@@ -3905,6 +3934,13 @@ theme: 'system',
             appSettings.deadlineAlertMinutes = parseInt(this.value);
             saveSettings();
             checkDeadlineAlerts();
+        });
+
+        settingAutoConfirm.addEventListener('change', function() {
+            appSettings.autoConfirmReminders = this.checked;
+            saveSettings();
+            // включили при наступивших напоминаниях — подтверждаем сразу
+            autoConfirmDueReminders();
         });
 
         // ====================================================================
@@ -4282,6 +4318,19 @@ theme: 'system',
             showInfoPopup(anchor, rows);
         }
 
+        // карточка активной задачи: создания/правки/дедлайн/повтор
+        function showActiveInfoPopup(anchor, li) {
+            const dateEl = li.querySelector('.task-date');
+            const chip = li.querySelector('.deadline-display');
+            const rule = parseRepeatRule(li.dataset.repeat);
+            const rows = [];
+            if (dateEl && dateEl.dataset.createdAt) rows.push([t('infoCreated'), formatFullDate(new Date(dateEl.dataset.createdAt))]);
+            if (dateEl && dateEl.dataset.editedAt) rows.push([t('editedPrefix'), formatFullDate(new Date(dateEl.dataset.editedAt))]);
+            if (chip && chip.dataset.deadline) rows.push([t('deadlineAt'), formatFullDate(new Date(chip.dataset.deadline))]);
+            if (rule) rows.push([t('repeatTitle'), repeatRuleText(rule)]);
+            showInfoPopup(anchor, rows);
+        }
+
         // карточка корзины: жизненный цикл задачи + время удаления
         function showTrashInfoPopup(anchor, li) {
             const dateEl = li.querySelector('.trash-date');
@@ -4341,8 +4390,9 @@ theme: 'system',
             return true;
         }
 
-        // собрать все привязки к датам видимого месяца: дедлайны + вхождения напоминаний
-        function collectCalendarItems(monthStart, monthEnd) {
+        // собрать все привязки к датам видимой сетки (включая дни соседних
+        // месяцев): дедлайны + вхождения напоминаний
+        function collectCalendarItems(rangeStart, rangeEnd) {
             const map = {};
             const push = (d, color, repeat) => {
                 const k = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
@@ -4357,11 +4407,11 @@ theme: 'system',
                 if (isNaN(cur.getTime())) return;
                 let guard = 0;
                 if (!repeat) {
-                    if (cur >= monthStart && cur <= monthEnd) push(cur, color, false);
+                    if (cur >= rangeStart && cur <= rangeEnd) push(cur, color, false);
                 } else {
-                    while (cur < monthStart && guard < 500) { cur = nextRepeatDate(cur, repeat); guard++; }
-                    while (cur <= monthEnd && guard < 500) {
-                        if (cur >= monthStart) push(cur, color, true);
+                    while (cur < rangeStart && guard < 500) { cur = nextRepeatDate(cur, repeat); guard++; }
+                    while (cur <= rangeEnd && guard < 500) {
+                        if (cur >= rangeStart) push(cur, color, true);
                         cur = nextRepeatDate(cur, repeat); guard++;
                     }
                 }
@@ -4438,14 +4488,19 @@ theme: 'system',
 
             const monthStart = new Date(y, m, 1);
             const monthEnd = new Date(y, m + 1, 0, 23, 59, 59);
-            const items = collectCalendarItems(monthStart, monthEnd);
+            // диапазон сетки с запасом: точки нужны и на днях соседних месяцев
+            const rangeStart = new Date(monthStart); rangeStart.setDate(rangeStart.getDate() - 7);
+            const rangeEnd = new Date(monthEnd); rangeEnd.setDate(rangeEnd.getDate() + 7);
+            const items = collectCalendarItems(rangeStart, rangeEnd);
             const today = new Date(); today.setHours(0, 0, 0, 0);
             let off = monthStart.getDay() - 1; if (off < 0) off = 6;
             const daysInMonth = monthEnd.getDate();
             const daysPrev = new Date(y, m, 0).getDate();
             const grid = document.getElementById('calTasksDays');
             grid.innerHTML = '';
-            for (let i = 0; i < 42; i++) {
+            // рендерим только нужные строки сетки — без пустого низа
+            const rows = Math.ceil((off + daysInMonth) / 7);
+            for (let i = 0; i < rows * 7; i++) {
                 let dayNum, cellDate, other = false;
                 if (i < off) { dayNum = daysPrev - off + i + 1; cellDate = new Date(y, m - 1, dayNum); other = true; }
                 else if (i >= off + daysInMonth) { dayNum = i - off - daysInMonth + 1; cellDate = new Date(y, m + 1, dayNum); other = true; }
@@ -4453,40 +4508,49 @@ theme: 'system',
                 const cell = document.createElement('div');
                 cell.className = 'cal-cell';
                 if (other) cell.classList.add('other-month');
+                if (cellDate < today) cell.classList.add('cal-past');
                 if (calendarDayFilter && calendarDayFilter.type === 'day' &&
                     calendarDayFilter.y === cellDate.getFullYear() &&
                     calendarDayFilter.m === cellDate.getMonth() &&
                     calendarDayFilter.d === cellDate.getDate()) cell.classList.add('selected');
                 if (cellDate.getTime() === today.getTime()) cell.classList.add('today');
+                cell.dataset.y = cellDate.getFullYear();
+                cell.dataset.m = cellDate.getMonth();
+                cell.dataset.d = cellDate.getDate();
                 const num = document.createElement('span');
                 num.className = 'cal-num';
                 num.textContent = dayNum;
                 cell.appendChild(num);
-                if (!other) {
-                    cell.dataset.y = cellDate.getFullYear();
-                    cell.dataset.m = cellDate.getMonth();
-                    cell.dataset.d = cellDate.getDate();
-                    const list = items[cellDate.getFullYear() + '-' + cellDate.getMonth() + '-' + cellDate.getDate()] || [];
-                    if (list.length) {
-                        const dots = document.createElement('span');
-                        dots.className = 'cal-dots';
-                        for (let k = 0; k < Math.min(list.length, 3); k++) {
-                            const dot = document.createElement('span');
-                            dot.className = 'cal-dot' + (list[k].repeat ? ' repeat' : '');
+                const list = items[cellDate.getFullYear() + '-' + cellDate.getMonth() + '-' + cellDate.getDate()] || [];
+                if (list.length) {
+                    const dots = document.createElement('span');
+                    dots.className = 'cal-dots';
+                    for (let k = 0; k < Math.min(list.length, 3); k++) {
+                        const dot = document.createElement('span');
+                        dot.className = 'cal-dot' + (list[k].repeat ? ' repeat' : '');
+                        if (list[k].repeat) {
+                            // «пончик»: кольцо цвета метки, середина под панель
+                            dot.style.borderColor = 'var(--task-color-' + list[k].color + ')';
+                        } else {
                             dot.style.background = 'var(--task-color-' + list[k].color + ')';
-                            dots.appendChild(dot);
                         }
-                        cell.appendChild(dots);
-                        if (list.length > 3) {
-                            const more = document.createElement('span');
-                            more.className = 'cal-more';
-                            more.textContent = '+' + (list.length - 3);
-                            cell.appendChild(more);
-                        }
+                        dots.appendChild(dot);
                     }
+                    // бейдж «+N» — в ту же строку, что и точки
+                    if (list.length > 3) {
+                        const more = document.createElement('span');
+                        more.className = 'cal-more';
+                        more.textContent = '+' + (list.length - 3);
+                        dots.appendChild(more);
+                    }
+                    cell.appendChild(dots);
                 }
                 grid.appendChild(cell);
             }
+            // назад текущего месяца не листаем
+            const prevBtn = document.getElementById('calTasksPrev');
+            const atCurrentMonth = y === today.getFullYear() && m === today.getMonth();
+            prevBtn.style.opacity = atCurrentMonth ? '0.25' : '';
             renderCalFooter();
         }
 
@@ -4495,9 +4559,15 @@ theme: 'system',
         }
 
         function setCalendarFilter(f) {
+            // запоминаем, где календарь был в кадре, чтобы после фильтрации
+            // вернуть его на место (высота списка меняется)
+            const calTopBefore = tasksCalendar.getBoundingClientRect().top;
             calendarDayFilter = f;
             if (f && searchRow.style.display !== 'none') setSearchOpen(false);
             else updateEmptyMsg();
+            const calTopAfter = tasksCalendar.getBoundingClientRect().top;
+            const delta = calTopAfter - calTopBefore;
+            if (Math.abs(delta) > 1) window.scrollBy(0, delta);
         }
 
         function updateTasksViewUI() {
@@ -4505,6 +4575,7 @@ theme: 'system',
             listViewBtn.classList.toggle('selected', !cal);
             calendarViewBtn.classList.toggle('selected', cal);
             tasksCalendar.style.display = cal ? '' : 'none';
+            document.getElementById('calTasksHead').style.display = cal ? '' : 'none';
         }
 
         function setTasksView(mode) {
@@ -4528,6 +4599,9 @@ theme: 'system',
             listViewBtn.addEventListener('click', () => setTasksView('list'));
             calendarViewBtn.addEventListener('click', () => setTasksView('calendar'));
             document.getElementById('calTasksPrev').addEventListener('click', () => {
+                // назад текущего месяца не листаем
+                const now = new Date();
+                if (calMonth.getFullYear() === now.getFullYear() && calMonth.getMonth() === now.getMonth()) return;
                 calMonth.setMonth(calMonth.getMonth() - 1);
                 renderTasksCalendar();
             });
@@ -4542,7 +4616,7 @@ theme: 'system',
             });
             document.getElementById('calTasksDays').addEventListener('click', e => {
                 const cell = e.target.closest('.cal-cell');
-                if (!cell || cell.classList.contains('other-month') || !cell.dataset.y) return;
+                if (!cell || !cell.dataset.y) return;
                 const y = +cell.dataset.y, m = +cell.dataset.m, d = +cell.dataset.d;
                 if (calendarDayFilter && calendarDayFilter.type === 'day' &&
                     calendarDayFilter.y === y && calendarDayFilter.m === m && calendarDayFilter.d === d) {
@@ -4551,6 +4625,8 @@ theme: 'system',
                 }
                 const has = Array.from(taskList.children).some(li => calendarMatches(li, { type: 'day', y: y, m: m, d: d }));
                 if (has) { setCalendarFilter({ type: 'day', y: y, m: m, d: d }); return; }
+                // пустой день соседнего месяца — не интерактивный
+                if (cell.classList.contains('other-month')) return;
                 // пустой день: подставляем дату как дедлайн новой задачи
                 const today0 = new Date(); today0.setHours(0, 0, 0, 0);
                 if (new Date(y, m, d) < today0) return;
@@ -4573,6 +4649,9 @@ theme: 'system',
                 if (!li || li.classList.contains('pending-move') || li.querySelector('.task-text-editing')) return;
                 // сразу после возврата карточки свайпом клик игнорируем
                 if (Date.now() - (li._swipedAt || 0) < 400) return;
+                // клик по дате создания — карточка с деталями
+                const dateEl = e.target.closest('.task-date');
+                if (dateEl) { showActiveInfoPopup(dateEl, li); return; }
 
                 const liRect = li.getBoundingClientRect();
                 // у напоминаний метка справа — зона клика зеркальная
@@ -4949,8 +5028,12 @@ theme: 'system',
         function handleToggleClick(li) {
             const was = li.classList.contains('completed');
             if (!was) {
-                // напоминание не «выполняется» — его кнопка переносит таймер
-                if (li.dataset.repeat) { handleReminderOk(li); return; }
+                // напоминание не «выполняется» — ОК работает только в день дедлайна
+                if (li.dataset.repeat) {
+                    if (!reminderDueToday(li)) return;
+                    handleReminderOk(li);
+                    return;
+                }
                 scheduleMove(li, '✓', t('moveToCompleted'), () => {
                     const d = li.querySelector('.deadline-display');
                     const hd = d !== null;
@@ -5795,10 +5878,13 @@ theme: 'system',
                 newHtml = CLOCK_SVG;
                 newTitle = t('setDeadline');
             }
-            if (updatePendingDeadlineButton._lastHtml !== newHtml) {
-                addDeadlineBtn.innerHTML = newHtml;
-                updatePendingDeadlineButton._lastHtml = newHtml;
-            }
+    if (updatePendingDeadlineButton._lastHtml !== newHtml) {
+        addDeadlineBtn.innerHTML = newHtml;
+        updatePendingDeadlineButton._lastHtml = newHtml;
+    }
+    // при установленном повторе индикатор метки — на правый край поля ввода
+    const inputWrap = document.querySelector('.input-wrapper');
+    if (inputWrap) inputWrap.classList.toggle('repeat-pending', !!pendingRepeat);
             if (updatePendingDeadlineButton._lastTitle !== newTitle) {
                 setIconLabel(addDeadlineBtn, newTitle);
                 updatePendingDeadlineButton._lastTitle = newTitle;
@@ -5900,6 +5986,7 @@ theme: 'system',
             }
             updateRepeatIcon(li);
             renderReminderStats(li);
+            refreshToggleButton(li);
             return li;
         }
 
@@ -5955,9 +6042,23 @@ theme: 'system',
             if (el) el.remove();
         }
 
+        // авто-подтверждение наступивших напоминаний (если включено в настройках)
+        function autoConfirmDueReminders() {
+            if (!appSettings.autoConfirmReminders) return;
+            const now = new Date();
+            Array.from(document.querySelectorAll('#taskList li')).forEach(li => {
+                if (!li.dataset.repeat || li.classList.contains('completed') || li.classList.contains('pending-move')) return;
+                const chip = li.querySelector('.deadline-display');
+                if (!chip || !chip.dataset.deadline) return;
+                const dl = new Date(chip.dataset.deadline);
+                if (!isNaN(dl.getTime()) && dl <= now) handleReminderOk(li, true);
+            });
+        }
+
         // подтверждение напоминания: перенести на следующий будущий слот;
-        // наступившее — мгновенно, досрочное — с 3-секундным отменяемым отсчётом
-        function handleReminderOk(li) {
+        // наступившее — мгновенно, досрочное — с 3-секундным отменяемым отсчётом;
+        // silent — без прокрутки к карточке (для авто-подтверждения)
+        function handleReminderOk(li, silent) {
             const chip = li.querySelector('.deadline-display');
             const rule = parseRepeatRule(li.dataset.repeat);
             if (!chip || !rule || !chip.dataset.deadline) return;
@@ -5976,7 +6077,7 @@ theme: 'system',
                 li.classList.add('appearing');
                 setTimeout(() => li.classList.remove('appearing'), 1500);
                 checkDeadlineAlerts();
-                setTimeout(() => { li.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
+                setTimeout(() => { if (!silent) li.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
             };
             if (current <= new Date()) { perform(); return; }
             scheduleMove(li, '↻', t('reminderMoveTo') + ' ' + formatFullDate(target), perform);
@@ -6031,19 +6132,38 @@ theme: 'system',
             showInfoPopup(anchor, rows);
         }
 
-        // кнопка ✓/OK/↩ в зависимости от состояния (напоминание → «OK»)
+        // наступил ли день дедлайна напоминания (сегодня или раньше)
+        function reminderDueToday(li) {
+            const chip = li.querySelector('.deadline-display');
+            if (!chip || !chip.dataset.deadline) return false;
+            const d = new Date(chip.dataset.deadline);
+            if (isNaN(d.getTime())) return false;
+            const startD = new Date(d); startD.setHours(0, 0, 0, 0);
+            const startN = new Date(); startN.setHours(0, 0, 0, 0);
+            return startD <= startN;
+        }
+
+        // кнопка ✓/OK/↩ в зависимости от состояния;
+        // у напоминания «OK» видна только в день дедлайна (и после — до подтверждения)
         function refreshToggleButton(li) {
             const btn = li.querySelector('.toggle-btn');
             if (!btn) return;
             if (li.classList.contains('completed')) {
                 btn.textContent = '↩';
                 setIconLabel(btn, t('moveToActive'));
+                btn.style.visibility = '';
+                btn.style.pointerEvents = '';
             } else if (li.dataset.repeat) {
                 btn.textContent = 'OK';
                 setIconLabel(btn, t('reminderOkTitle'));
+                const dueToday = reminderDueToday(li);
+                btn.style.visibility = dueToday ? '' : 'hidden';
+                btn.style.pointerEvents = dueToday ? '' : 'none';
             } else {
                 btn.textContent = '✓';
                 setIconLabel(btn, t('moveToCompleted'));
+                btn.style.visibility = '';
+                btn.style.pointerEvents = '';
             }
         }
 
@@ -6222,10 +6342,16 @@ theme: 'system',
         // действительно прокручивается: короткому списку лишняя пустота не нужна
         function updateTailSpace() {
             const panel = document.querySelector('.panel-tasks');
-            // min-height:100vh у body всегда даёт ~30px «прокрутки» — проверяем реальный
-            // нижний край панели задач, а не scrollHeight документа
-            const panelDocBottom = panel.getBoundingClientRect().bottom + window.scrollY;
-            panel.classList.toggle('tail-space', panelDocBottom > window.innerHeight - 15);
+            // при активном фильтре по дню сохраняем высоту страницы:
+            // календарь должен оставаться на своём месте в кадре
+            if (calendarDayFilter) {
+                panel.classList.add('tail-space');
+            } else {
+                // min-height:100vh у body всегда даёт ~30px «прокрутки» — проверяем реальный
+                // нижний край панели задач, а не scrollHeight документа
+                const panelDocBottom = panel.getBoundingClientRect().bottom + window.scrollY;
+                panel.classList.toggle('tail-space', panelDocBottom > window.innerHeight - 15);
+            }
             const pairs = [['completedList', 'completedModal'], ['trashList', 'trashModal']];
             pairs.forEach(pair => {
                 const ul = document.getElementById(pair[0]);
@@ -6254,10 +6380,27 @@ theme: 'system',
                 }
                 activeFilterPalette.style.display = 'none';
                 applySearch();
-            } else {
-                updateFilterPalettes();
-                searchInput.focus({ preventScroll: true });
-            }
+    } else {
+        updateFilterPalettes();
+        searchInput.focus({ preventScroll: true });
+        // на смартфоне клавиатура может закрыть строку (особенно под календарём):
+        // после появления клавиатуры центрируем строку в видимой области
+        if (isTouchDevice) {
+            const bring = () => {
+                const r = searchInput.getBoundingClientRect();
+                const vv = window.visualViewport;
+                const visibleH = vv ? vv.height : window.innerHeight;
+                const visibleTop = vv ? vv.offsetTop : 0;
+                if (r.top >= visibleTop && r.bottom <= visibleTop + visibleH) return;
+                window.scrollBy({ top: r.top - (visibleTop + (visibleH - r.height) / 2), behavior: 'smooth' });
+            };
+            const vv = window.visualViewport;
+            const onResize = () => bring();
+            if (vv) vv.addEventListener('resize', onResize);
+            setTimeout(bring, 350);
+            setTimeout(() => { if (vv) vv.removeEventListener('resize', onResize); }, 1500);
+        }
+    }
         }
 
         searchBtn.addEventListener('click', () => {
@@ -7013,12 +7156,11 @@ theme: 'system',
         function updateDateDisplay(el) {
             const createdAt = new Date(el.dataset.createdAt);
             const editedAt = el.dataset.editedAt ? new Date(el.dataset.editedAt) : null;
+            // подсказки больше нет — все детали по клику в карточке
             if (editedAt) {
                 el.innerHTML = PENCIL_SVG + (appSettings.useRelativeTime ? formatRelativeTime(editedAt) : formatShortDateTime(editedAt));
-                el.title = `${t('addedFullPrefix')} ${formatFullDate(createdAt)}\n${t('editedPrefix')} ${formatFullDate(editedAt)}`;
             } else {
                 el.textContent = appSettings.useRelativeTime ? formatRelativeTime(createdAt) : formatShortDateTime(createdAt);
-                el.title = `${t('addedFullPrefix')} ${formatFullDate(createdAt)}`;
             }
         }
 
@@ -7079,6 +7221,9 @@ theme: 'system',
             try {
                 refreshDeadlineTexts();
                 refreshAllDeadlines();
+                autoConfirmDueReminders();
+                // в день дедлайна у напоминания появляется кнопка ОК
+                document.querySelectorAll('#taskList li[data-repeat]').forEach(refreshToggleButton);
                 checkDeadlineAlerts();
                 updatePendingDeadlineButton();
             } catch (e) { console.error('Ошибка фонового обновления:', e); }
@@ -7491,9 +7636,9 @@ theme: 'system',
                             action(row);
                         }, 220);
                     } else {
-                        // возврат: гасим клик по этой карточке на короткое время,
-                        // чтобы возврат не открыл редактор текста
-                        row._swipedAt = Date.now();
+                        // гасим клик только после реального горизонтального свайпа —
+                        // иначе тап по метке/тексту на таче проглатывался бы
+                        if (decided === 'h') row._swipedAt = Date.now();
                         row.style.transform = '';
                         setTimeout(() => { row.style.transition = ''; }, 260);
                     }
@@ -7724,11 +7869,22 @@ theme: 'system',
         window.addEventListener('popstate', function(e) {
             const editing = document.querySelector('.task-text-editing');
             if (editing) {
-                // Запись истории уже снята самим браузером — не зовём back() повторно
+                // Запись истории уже снята самым браузером — не зовём back() повторно
                 editHistoryPushed = false;
                 editing.blur();
             }
         });
+
+        // ====================================================================
+        //  PWA: установка на главный экран (GitHub Pages) + офлайн-кеш.
+        //  Локально из файла (file://) воркер не активируется — ничего не меняется
+        // ====================================================================
+        if ('serviceWorker' in navigator &&
+            (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('sw.js').catch(function () { /* офлайн не критичен */ });
+            });
+        }
     </script>
 </body>
 </html>
