@@ -1372,6 +1372,21 @@ font-size: 14px;
         .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
         .cal-weekday { text-align: center; font-size: 11px; color: var(--text-muted); font-weight: 600; padding: 2px 0; text-transform: capitalize; }
         .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .cal-rows-spin { display: flex; align-items: center; gap: 4px; }
+        .cal-rows-btn {
+            width: 28px; height: 28px; border: 1px solid var(--border-input);
+            border-radius: 6px; background: var(--bg-input); color: var(--text-primary);
+            font-size: 15px; line-height: 1; cursor: pointer; transition: border-color 0.2s, color 0.2s;
+        }
+        .cal-rows-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        .cal-rows-btn:active { background: var(--accent-black-hover); }
+        #settingCalRows {
+            width: 34px; text-align: center; padding: 4px 2px;
+            border: 2px solid var(--border-input); border-radius: 6px;
+            font-size: 14px; font-weight: 600; color: var(--text-primary);
+            background: var(--bg-input); cursor: default; user-select: none;
+            -webkit-user-select: none; pointer-events: none;
+        }
         .cal-cell {
             min-height: 20px;
             display: flex; flex-direction: column; align-items: center;
@@ -1885,7 +1900,11 @@ font-size: 14px;
                     <label for="settingCalRows" id="calRowsLabel">Строк в календаре</label>
                     <div class="settings-hint" id="calRowsHint">сколько недель задач показывать</div>
                 </div>
-                <input type="text" id="settingCalRows" inputmode="numeric" maxlength="1">
+                <div class="cal-rows-spin">
+                    <button type="button" class="cal-rows-btn" id="calRowsMinus" aria-label="Меньше">−</button>
+                    <input type="text" id="settingCalRows" inputmode="numeric" maxlength="1" readonly tabindex="-1">
+                    <button type="button" class="cal-rows-btn" id="calRowsPlus" aria-label="Больше">+</button>
+                </div>
             </div>
             <div class="settings-group settings-backup">
                 <label>Резервное копирование</label>
@@ -2357,7 +2376,7 @@ theme: 'system',
             collapseHeightPx: 120,
             tasksView: 'list',
             autoConfirmReminders: 'off',
-            calRows: 5
+            calRows: 3
 };
         let appSettings = { ...defaultSettings };
 
@@ -3526,7 +3545,7 @@ theme: 'system',
             settingLanguage.value = appSettings.language || 'ru';
         settingDeadlineAlert.value = appSettings.deadlineAlertMinutes || 0;
             settingAutoConfirm.value = appSettings.autoConfirmReminders || 'off';
-            settingCalRows.value = appSettings.calRows || 5;
+            settingCalRows.value = appSettings.calRows || 3;
             updateNewTaskPositionBtn();
             settingsModal.classList.add('active');
             // при открытии прокрутка всегда сверху
@@ -4011,23 +4030,18 @@ theme: 'system',
             autoConfirmDueReminders();
         });
 
-        settingCalRows.addEventListener('focus', function() {
-            this.dataset.saved = this.value;
-        });
-        settingCalRows.addEventListener('input', function() {
-            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 1);
-        });
-        settingCalRows.addEventListener('blur', function() {
-            let v = parseInt(this.value);
-            if (isNaN(v)) v = parseInt(this.dataset.saved) || 5;
-            v = Math.min(8, Math.max(2, v));
-            this.value = v;
+        // число строк календаря: только кнопки −/+, поле — только чтение
+        const calRowsStep = (delta) => {
+            const v = Math.min(8, Math.max(2, (appSettings.calRows || 3) + delta));
+            settingCalRows.value = v;
             if (appSettings.calRows !== v) {
                 appSettings.calRows = v;
                 saveSettings();
                 refreshTasksCalendar();
             }
-        });
+        };
+        document.getElementById('calRowsMinus').addEventListener('click', () => calRowsStep(-1));
+        document.getElementById('calRowsPlus').addEventListener('click', () => calRowsStep(1));
 
         // ====================================================================
         //  Клавиатура: Esc/Enter/Delete с учётом открытых окон
@@ -4558,7 +4572,7 @@ theme: 'system',
             const dow = (start.getDay() + 6) % 7; // 0 = понедельник
             start.setDate(start.getDate() - dow - 7 + calWeekOffset * 7);
             calWindowStart = new Date(start);
-            const rows = Math.min(8, Math.max(2, appSettings.calRows || 5));
+            const rows = Math.min(8, Math.max(2, appSettings.calRows || 3));
             const end = new Date(start); end.setDate(end.getDate() + rows * 7 - 1); end.setHours(23, 59, 59, 999);
             const fmt = { day: 'numeric', month: 'short' };
             document.getElementById('calTasksTitle').textContent =
@@ -4649,7 +4663,7 @@ theme: 'system',
             refreshTasksCalendar();
             if (!newDs || !calendarDayFilter) return;
             const nd = new Date(newDs); nd.setHours(0, 0, 0, 0);
-            const rows = Math.min(8, Math.max(2, appSettings.calRows || 5));
+            const rows = Math.min(8, Math.max(2, appSettings.calRows || 3));
             if (!calWindowStart) return;
             const wS = new Date(calWindowStart);
             const wE = new Date(wS); wE.setDate(wE.getDate() + rows * 7 - 1);
