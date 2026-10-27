@@ -187,7 +187,7 @@
             max-width: 500px;
             transition: background-color 0.3s, box-shadow 0.3s;
         }
-        .panel-tasks { margin-top: 8px; min-height: 80px; overflow-x: clip; }
+        .panel-tasks { margin-top: 8px; min-height: 80px; overflow-x: clip; overflow-anchor: none; }
         /* пустое место внизу списков (пятая часть экрана), чтобы был виден конец списка */
         .panel-tasks.tail-space { padding-bottom: calc(100vh / 5); }
         #completedList.tail-space, #trashList.tail-space { padding-bottom: calc(100vh / 5); }
@@ -1066,7 +1066,14 @@ font-size: 14px;
             box-sizing: border-box;
         }
         .sync-form input:focus { border-color: var(--border-focus); }
-        .sync-buttons { display: flex; gap: 8px; margin-top: 8px; }
+        .sync-buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .sync-buttons .modal-btn-outline { flex: 1 1 auto; white-space: nowrap; }
+        .sync-link {
+            background: none; border: none; padding: 3px 0 0 0; cursor: pointer;
+            color: var(--text-secondary); font-size: 12px; font-family: inherit;
+            text-align: left; transition: color 0.2s;
+        }
+        .sync-link:hover { color: var(--accent-primary); }
         .settings-danger-label {
             background: none;
             border: none;
@@ -1366,13 +1373,15 @@ font-size: 14px;
         .cal-cell {
             min-height: 20px;
             display: flex; flex-direction: column; align-items: center;
-            padding: 3px 0 2px; border-radius: 8px; cursor: pointer;
+            padding: 3px 0 2px; border-radius: 8px;
             border: 1.5px solid transparent; transition: background 0.15s;
         }
-        .cal-cell:hover { background: var(--accent-black-hover); }
+        /* интерактивны только дни с задачами */
+        .cal-cell.has-tasks { cursor: pointer; }
+        .cal-cell.has-tasks:hover { background: var(--accent-black-hover); }
         .cal-num { font-size: 12px; color: var(--text-primary); line-height: 1.2; }
         .cal-cell.other-month .cal-num { color: var(--text-other-month); }
-        .cal-cell.other-month { cursor: pointer; }
+        .cal-cell.other-month.has-tasks { cursor: pointer; }
         .cal-cell.today .cal-num { font-weight: 700; color: var(--bg-calendar-today-text); }
         .cal-cell.selected { border-color: var(--accent-primary); background: var(--accent-primary-bg); }
         .cal-dots { display: flex; gap: 3px; margin-top: 3px; flex-wrap: wrap; justify-content: center; max-width: 100%; padding: 0 2px; }
@@ -1858,7 +1867,11 @@ font-size: 14px;
                     <label for="settingAutoConfirm" id="autoConfirmLabel">Автоматически подтверждать напоминания</label>
                     <div class="settings-hint" id="autoConfirmHint">по наступлении срока переносить на следующую дату</div>
                 </div>
-                <input type="checkbox" id="settingAutoConfirm">
+                <select id="settingAutoConfirm">
+                    <option value="off" id="autoConfirmOff">Выключено</option>
+                    <option value="ontime" id="autoConfirmOnTime">По наступлении времени</option>
+                    <option value="endofday" id="autoConfirmEndOfDay">В конце дня</option>
+                </select>
             </div>
             <div class="settings-group settings-backup">
                 <label>Резервное копирование</label>
@@ -1873,12 +1886,15 @@ font-size: 14px;
                 <div class="sync-form" id="syncForm">
                     <input type="email" id="syncEmail" placeholder="email" autocomplete="username">
                     <input type="password" id="syncPassword" placeholder="пароль" autocomplete="current-password">
+                    <button type="button" class="sync-link" id="syncForgotBtn">Забыли пароль?</button>
                 </div>
                 <div class="sync-buttons">
                     <button type="button" class="modal-btn-outline" id="syncLoginBtn">Войти</button>
                     <button type="button" class="modal-btn-outline" id="syncRegisterBtn">Создать аккаунт</button>
+                    <button type="button" class="modal-btn-outline" id="syncGoogleBtn">Через Google</button>
                     <button type="button" class="modal-btn-outline" id="syncLogoutBtn" style="display: none;">Выйти</button>
                 </div>
+                <button type="button" class="sync-link" id="syncVerifyBtn" style="display: none;">Отправить письмо подтверждения</button>
             </div>
             <div class="settings-group settings-danger">
                 <div>
@@ -1994,7 +2010,6 @@ font-size: 14px;
         let completedColorFilter = null;
         let calMonth = (function () { const d = new Date(); d.setDate(1); return d; })();
         let calendarDayFilter = null;
-        let quickAddFromCalendar = false;
         let expandedTasks = new WeakSet();       // развёрнутые свёрнутые-задачи (слабые ссылки)
         let resizeTimer = null;                  // дебаунс обработчика resize
         const DEFAULT_MAX_TASK_LENGTH = 350;
@@ -2109,6 +2124,8 @@ font-size: 14px;
                 timeOne: 'раз', timeFew: 'раза', timeMany: 'раз',
                 autoConfirm: 'Автоматически подтверждать напоминания',
                 autoConfirmHint: 'по наступлении срока переносить на следующую дату',
+                autoConfirmOff: 'Выключено', autoConfirmOnTime: 'По наступлении времени',
+                autoConfirmEndOfDay: 'В конце дня',
                 viewList: 'Список', viewCalendar: 'Календарь',
                 calToday: 'Сегодня', calNoDate: 'Без даты', calReset: 'Сбросить',
                 calNewTaskHint: 'Новая задача на:',
@@ -2130,6 +2147,12 @@ font-size: 14px;
                 syncErrWeak: 'Пароль должен быть не короче 6 символов',
                 syncErrEmail: 'Некорректный email',
                 syncErrNetwork: 'Нет соединения с Firebase',
+                syncForgot: 'Забыли пароль?', syncGoogle: 'Через Google',
+                syncResetSent: 'Письмо для сброса пароля отправлено',
+                syncVerifyBtn: 'Отправить письмо подтверждения',
+                syncVerifySent: 'Письмо подтверждения отправлено',
+                syncVerifyHint: 'подтвердите email по ссылке из письма',
+                syncErrNoUser: 'Аккаунт с таким email не найден',
                 restoreToActive: 'В активные задачи', restoreToCompleted: 'В выполненные задачи', deleteForever: 'Удалить навсегда',
                 moveToCompleted: 'Перемещение в «Выполненные»', moveToActive: 'Возврат в активные задачи',
                 moveToTrash: 'Перемещение в корзину', restoreTask: 'Восстановление задачи', deletingForever: 'Удаление навсегда',
@@ -2210,6 +2233,8 @@ collapseTask: 'Свернуть'
                 timeOne: 'time', timeFew: 'times', timeMany: 'times',
                 autoConfirm: 'Auto-confirm reminders',
                 autoConfirmHint: 'when due, move to the next date',
+                autoConfirmOff: 'Off', autoConfirmOnTime: 'When due',
+                autoConfirmEndOfDay: 'At end of day',
                 viewList: 'List', viewCalendar: 'Calendar',
                 calToday: 'Today', calNoDate: 'No date', calReset: 'Reset',
                 calNewTaskHint: 'New task on:',
@@ -2231,6 +2256,12 @@ collapseTask: 'Свернуть'
                 syncErrWeak: 'Password must be at least 6 characters',
                 syncErrEmail: 'Invalid email',
                 syncErrNetwork: 'No connection to Firebase',
+                syncForgot: 'Forgot password?', syncGoogle: 'With Google',
+                syncResetSent: 'Password reset email sent',
+                syncVerifyBtn: 'Send verification email',
+                syncVerifySent: 'Verification email sent',
+                syncVerifyHint: 'confirm your email via the link in the letter',
+                syncErrNoUser: 'No account with this email',
                 restoreToActive: 'To active tasks', restoreToCompleted: 'To completed tasks', deleteForever: 'Delete forever',
                 moveToCompleted: 'Moving to "Completed"', moveToActive: 'Returning to active tasks',
                 moveToTrash: 'Moving to trash', restoreTask: 'Restoring task', deletingForever: 'Deleting forever',
@@ -2305,7 +2336,7 @@ theme: 'system',
             collapseActiveTasks: false,
             collapseHeightPx: 120,
             tasksView: 'list',
-            autoConfirmReminders: false
+            autoConfirmReminders: 'off'
 };
         let appSettings = { ...defaultSettings };
 
@@ -3262,6 +3293,9 @@ theme: 'system',
             updateNdaysUnitText();
             document.getElementById('autoConfirmLabel').textContent = t('autoConfirm');
             document.getElementById('autoConfirmHint').textContent = t('autoConfirmHint');
+            document.getElementById('autoConfirmOff').textContent = t('autoConfirmOff');
+            document.getElementById('autoConfirmOnTime').textContent = t('autoConfirmOnTime');
+            document.getElementById('autoConfirmEndOfDay').textContent = t('autoConfirmEndOfDay');
             setIconLabel(listViewBtn, t('viewList'));
             setIconLabel(calendarViewBtn, t('viewCalendar'));
             document.getElementById('calTasksToday').title = t('calToday');
@@ -3269,6 +3303,9 @@ theme: 'system',
             document.getElementById('syncTitleLabel').textContent = t('syncTitle');
             document.getElementById('syncLoginBtn').textContent = t('syncLogin');
             document.getElementById('syncRegisterBtn').textContent = t('syncRegister');
+            document.getElementById('syncGoogleBtn').textContent = t('syncGoogle');
+            document.getElementById('syncForgotBtn').textContent = t('syncForgot');
+            document.getElementById('syncVerifyBtn').textContent = t('syncVerifyBtn');
             document.getElementById('syncLogoutBtn').textContent = t('syncLogout');
             cloudUpdateStatus(false);
             const ndaysRepeatBtn = document.querySelector('#repeatRow .repeat-btn[data-key="ndays"]');
@@ -3398,6 +3435,13 @@ theme: 'system',
                         else appSettings.deadlineAlertMinutes = 0;
                         delete appSettings.deadlineAlerts;
                     }
+                    // миграция старого чекбокса авто-подтверждения (true/false) в режимы
+                    if (typeof appSettings.autoConfirmReminders === 'boolean') {
+                        appSettings.autoConfirmReminders = appSettings.autoConfirmReminders ? 'ontime' : 'off';
+                    }
+                    if (['off', 'ontime', 'endofday'].indexOf(appSettings.autoConfirmReminders) === -1) {
+                        appSettings.autoConfirmReminders = 'off';
+                    }
                 }
                 // пресеты дедлайна: старым настройкам засеваем набор по умолчанию,
                 // от пришедших оставляем только корректные записи
@@ -3457,9 +3501,9 @@ theme: 'system',
             settingRelativeTime.checked = appSettings.useRelativeTime;
             settingNewTaskOnTop.checked = appSettings.newTaskOnTop;
             settingLanguage.value = appSettings.language || 'ru';
-            settingDeadlineAlert.value = appSettings.deadlineAlertMinutes || 0;
-            settingAutoConfirm.checked = !!appSettings.autoConfirmReminders;
-            updateNewTaskPositionBtn();
+        settingDeadlineAlert.value = appSettings.deadlineAlertMinutes || 0;
+        settingAutoConfirm.value = appSettings.autoConfirmReminders || 'off';
+        updateNewTaskPositionBtn();
             settingsModal.classList.add('active');
             // при открытии прокрутка всегда сверху
             settingsModal.querySelector('.modal-scroll').scrollTop = 0;
@@ -3937,9 +3981,9 @@ theme: 'system',
         });
 
         settingAutoConfirm.addEventListener('change', function() {
-            appSettings.autoConfirmReminders = this.checked;
+            appSettings.autoConfirmReminders = this.value;
             saveSettings();
-            // включили при наступивших напоминаниях — подтверждаем сразу
+            // сменили режим — применяем сразу
             autoConfirmDueReminders();
         });
 
@@ -4242,11 +4286,11 @@ theme: 'system',
             if (taskInfoPopup && !taskInfoPopup.contains(e.target) && !e.target.closest('.task-completed-info')) {
                 // повторный клик по тому же времени не гасим здесь —
                 // его обработает тоггл в обработчике списка
-                if (taskInfoPopup._anchor && taskInfoPopup._anchor === e.target.closest('.task-completed-info, .trash-date')) return;
+                if (taskInfoPopup._anchor && taskInfoPopup._anchor === e.target.closest('.task-completed-info, .trash-date, .task-date')) return;
                 closeTaskInfoPopup();
                 // клик по «пустому месту» с открытой карточкой закрывает только её:
                 // гасим дальнейшую обработку, чтобы не закрылось само модальное окно
-                if (!e.target.closest('button, input, select, textarea, a, label, .trash-date, .task-completed-info, .deadline-display')) {
+                if (!e.target.closest('button, input, select, textarea, a, label, .trash-date, .task-completed-info, .task-date, .deadline-display')) {
                     e.preventDefault();
                     e.stopPropagation();
                 }
@@ -4440,7 +4484,8 @@ theme: 'system',
                 else if (calendarDayFilter.type === 'due') label = t('reminderDue');
                 else label = t('calNoDate');
                 const n = Array.from(taskList.children).filter(li => calendarMatches(li, calendarDayFilter)).length;
-                const row = addRow('selected-row', label + ' · ' + n + ' ' + formatUnitCount(n, 'task'), () => {});
+                // клик по всей выбранной строке сбрасывает фильтр (как и ✕)
+                const row = addRow('selected-row', label + ' · ' + n + ' ' + formatUnitCount(n, 'task'), () => setCalendarFilter(null));
                 const x = document.createElement('span');
                 x.className = 'cal-reset';
                 x.textContent = '✕';
@@ -4459,28 +4504,13 @@ theme: 'system',
             if (over) addRow('overdue', t('overdue') + ': ' + over, () => setCalendarFilter({ type: 'overdue' }));
             if (due) addRow('due', t('reminderDue') + ': ' + due, () => setCalendarFilter({ type: 'due' }));
             if (nodate) addRow('', t('calNoDate') + ': ' + nodate, () => setCalendarFilter({ type: 'nodate' }));
-            if (quickAddFromCalendar && pendingDeadline) {
-                const row = addRow('', t('calNewTaskHint') + ' ' + formatShortDateTime(new Date(pendingDeadline)), () => focusTaskInput());
-                const x = document.createElement('span');
-                x.className = 'cal-reset';
-                x.textContent = '✕';
-                x.addEventListener('click', ev => {
-                    ev.stopPropagation();
-                    pendingDeadline = null;
-                    pendingRepeat = null;
-                    quickAddFromCalendar = false;
-                    updatePendingDeadlineButton();
-                    renderCalFooter();
-                });
-                row.appendChild(x);
-            }
         }
 
         function renderTasksCalendar() {
             if (!tasksCalendar || appSettings.tasksView !== 'calendar') return;
             const locale = localeStr();
             const y = calMonth.getFullYear(), m = calMonth.getMonth();
-            document.getElementById('calTasksTitle').textContent = calMonth.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+            document.getElementById('calTasksTitle').textContent = calMonth.toLocaleDateString(locale, { month: 'long' }) + ' ' + calMonth.getFullYear();
             const wd = [];
             const monday = new Date(2024, 0, 1);
             for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(monday.getDate() + i); wd.push(d.toLocaleDateString(locale, { weekday: 'narrow' })); }
@@ -4523,6 +4553,7 @@ theme: 'system',
                 cell.appendChild(num);
                 const list = items[cellDate.getFullYear() + '-' + cellDate.getMonth() + '-' + cellDate.getDate()] || [];
                 if (list.length) {
+                    cell.classList.add('has-tasks');
                     const dots = document.createElement('span');
                     dots.className = 'cal-dots';
                     for (let k = 0; k < Math.min(list.length, 3); k++) {
@@ -4558,16 +4589,39 @@ theme: 'system',
             if (appSettings.tasksView === 'calendar') renderTasksCalendar();
         }
 
+        // распорка внизу: не даёт странице стать короче текущей прокрутки,
+        // иначе браузер «подкинет» наверх при фильтрации списка
+        function ensureCalendarScrollHeight(targetScroll) {
+            const needed = targetScroll + window.innerHeight + 40;
+            const deficit = needed - document.documentElement.scrollHeight;
+            if (deficit <= 0) return;
+            let spacer = document.getElementById('calScrollSpacer');
+            if (!spacer) {
+                spacer = document.createElement('div');
+                spacer.id = 'calScrollSpacer';
+                document.querySelector('.panel-tasks').appendChild(spacer);
+            }
+            spacer.style.height = Math.round((parseFloat(spacer.style.height) || 0) + deficit) + 'px';
+        }
+
         function setCalendarFilter(f) {
-            // запоминаем, где календарь был в кадре, чтобы после фильтрации
-            // вернуть его на место (высота списка меняется)
-            const calTopBefore = tasksCalendar.getBoundingClientRect().top;
+            // запоминаем точную позицию прокрутки, чтобы после пересчёта списка
+            // вернуть страницу ровно туда, где она была
+            const scrollBefore = window.scrollY;
             calendarDayFilter = f;
             if (f && searchRow.style.display !== 'none') setSearchOpen(false);
             else updateEmptyMsg();
-            const calTopAfter = tasksCalendar.getBoundingClientRect().top;
-            const delta = calTopAfter - calTopBefore;
-            if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+            // страница не должна стать короче текущей прокрутки — распорка + возврат точки
+            ensureCalendarScrollHeight(scrollBefore);
+            window.scrollTo({ top: scrollBefore, behavior: 'auto' });
+            requestAnimationFrame(() => {
+                ensureCalendarScrollHeight(scrollBefore);
+                if (Math.abs(window.scrollY - scrollBefore) > 1) window.scrollTo({ top: scrollBefore, behavior: 'auto' });
+                if (!f) {
+                    const spacer = document.getElementById('calScrollSpacer');
+                    if (spacer) spacer.remove();
+                }
+            });
         }
 
         function updateTasksViewUI() {
@@ -4625,19 +4679,7 @@ theme: 'system',
                 }
                 const has = Array.from(taskList.children).some(li => calendarMatches(li, { type: 'day', y: y, m: m, d: d }));
                 if (has) { setCalendarFilter({ type: 'day', y: y, m: m, d: d }); return; }
-                // пустой день соседнего месяца — не интерактивный
-                if (cell.classList.contains('other-month')) return;
-                // пустой день: подставляем дату как дедлайн новой задачи
-                const today0 = new Date(); today0.setHours(0, 0, 0, 0);
-                if (new Date(y, m, d) < today0) return;
-                const date = new Date(y, m, d, 23, 59, 0);
-                if (date <= new Date()) return;
-                pendingDeadline = date.toISOString();
-                pendingRepeat = null;
-                quickAddFromCalendar = true;
-                updatePendingDeadlineButton();
-                renderCalFooter();
-                focusTaskInput();
+                // пустой день (без задач) — не интерактивный
             });
             updateTasksViewUI();
             if (appSettings.tasksView === 'calendar') renderTasksCalendar();
@@ -4649,9 +4691,13 @@ theme: 'system',
                 if (!li || li.classList.contains('pending-move') || li.querySelector('.task-text-editing')) return;
                 // сразу после возврата карточки свайпом клик игнорируем
                 if (Date.now() - (li._swipedAt || 0) < 400) return;
-                // клик по дате создания — карточка с деталями
+                // клик по дате создания — карточка с деталями (повторный закрывает)
                 const dateEl = e.target.closest('.task-date');
-                if (dateEl) { showActiveInfoPopup(dateEl, li); return; }
+                if (dateEl) {
+                    if (taskInfoPopup && taskInfoPopup._anchor === dateEl) { closeTaskInfoPopup(); return; }
+                    showActiveInfoPopup(dateEl, li);
+                    return;
+                }
 
                 const liRect = li.getBoundingClientRect();
                 // у напоминаний метка справа — зона клика зеркальная
@@ -5841,7 +5887,6 @@ theme: 'system',
             updateCharCounter(taskInput, document.getElementById('taskInputCounter'));
             pendingDeadline = null;
             pendingRepeat = null;
-            quickAddFromCalendar = false;
             updatePendingDeadlineButton();
             saveTasks();
             updateEmptyMsg();
@@ -6042,16 +6087,26 @@ theme: 'system',
             if (el) el.remove();
         }
 
-        // авто-подтверждение наступивших напоминаний (если включено в настройках)
+        // авто-подтверждение напоминаний по выбранному режиму:
+        // 'ontime' — как только время наступило; 'endofday' — когда день дедлайна прошёл
         function autoConfirmDueReminders() {
-            if (!appSettings.autoConfirmReminders) return;
+            const mode = appSettings.autoConfirmReminders;
+            if (!mode || mode === 'off') return;
             const now = new Date();
+            const startN = new Date(); startN.setHours(0, 0, 0, 0);
             Array.from(document.querySelectorAll('#taskList li')).forEach(li => {
                 if (!li.dataset.repeat || li.classList.contains('completed') || li.classList.contains('pending-move')) return;
                 const chip = li.querySelector('.deadline-display');
                 if (!chip || !chip.dataset.deadline) return;
                 const dl = new Date(chip.dataset.deadline);
-                if (!isNaN(dl.getTime()) && dl <= now) handleReminderOk(li, true);
+                if (isNaN(dl.getTime())) return;
+                let shouldConfirm = false;
+                if (mode === 'ontime') shouldConfirm = dl <= now;
+                else if (mode === 'endofday') {
+                    const startD = new Date(dl); startD.setHours(0, 0, 0, 0);
+                    shouldConfirm = startD < startN;
+                }
+                if (shouldConfirm) handleReminderOk(li, true);
             });
         }
 
@@ -7448,6 +7503,14 @@ theme: 'system',
             st.style.color = '';
             if (!cloud.user) { st.textContent = t('syncLoggedOut'); return; }
             const time = new Date().toLocaleTimeString(localeStr(), { hour: '2-digit', minute: '2-digit' });
+            // email-аккаунт без подтверждения — напомним вместо времени
+            const unverified = cloud.user.providerData[0] && cloud.user.providerData[0].providerId === 'password'
+                && cloud.user.emailVerified === false;
+            if (unverified) {
+                st.textContent = cloud.user.email + ' · ' + t('syncVerifyHint');
+                st.style.color = 'var(--text-warning)';
+                return;
+            }
             st.textContent = (pulled ? t('syncApplied') + ' · ' : '') + cloud.user.email + ' · ' + time;
         }
 
@@ -7466,7 +7529,41 @@ theme: 'system',
                 const email = document.getElementById('syncEmail').value.trim();
                 const pass = document.getElementById('syncPassword').value;
                 try {
-                    await authMod.createUserWithEmailAndPassword(cloud.auth, email, pass);
+                    const cred = await authMod.createUserWithEmailAndPassword(cloud.auth, email, pass);
+                    // реальный email: сразу отправляем письмо подтверждения
+                    if (cred.user) await authMod.sendEmailVerification(cred.user).catch(() => {});
+                    cloudUpdateStatus(false);
+                } catch (e) { cloudShowAuthError(e); }
+            });
+            document.getElementById('syncForgotBtn').addEventListener('click', async () => {
+                const email = document.getElementById('syncEmail').value.trim();
+                const st = document.getElementById('syncStatus');
+                try {
+                    await authMod.sendPasswordResetEmail(cloud.auth, email);
+                    st.style.color = '';
+                    st.textContent = t('syncResetSent');
+                } catch (e) { cloudShowAuthError(e); }
+            });
+            document.getElementById('syncGoogleBtn').addEventListener('click', async () => {
+                const provider = new authMod.GoogleAuthProvider();
+                try {
+                    await authMod.signInWithPopup(cloud.auth, provider);
+                } catch (e) {
+                    // в standalone-PWA попапы могут блокироваться — уходим в redirect
+                    if (e && e.code === 'auth/popup-blocked') {
+                        try { await authMod.signInWithRedirect(cloud.auth, provider); }
+                        catch (e2) { cloudShowAuthError(e2); }
+                    } else { cloudShowAuthError(e); }
+                }
+            });
+            document.getElementById('syncVerifyBtn').addEventListener('click', async () => {
+                const st = document.getElementById('syncStatus');
+                try {
+                    if (cloud.user) {
+                        await authMod.sendEmailVerification(cloud.user);
+                        st.style.color = '';
+                        st.textContent = t('syncVerifySent');
+                    }
                 } catch (e) { cloudShowAuthError(e); }
             });
             document.getElementById('syncLogoutBtn').addEventListener('click', async () => {
@@ -7478,7 +7575,12 @@ theme: 'system',
             document.getElementById('syncForm').style.display = loggedIn ? 'none' : '';
             document.getElementById('syncLoginBtn').style.display = loggedIn ? 'none' : '';
             document.getElementById('syncRegisterBtn').style.display = loggedIn ? 'none' : '';
+            document.getElementById('syncGoogleBtn').style.display = loggedIn ? 'none' : '';
+            document.getElementById('syncForgotBtn').style.display = loggedIn ? 'none' : '';
             document.getElementById('syncLogoutBtn').style.display = loggedIn ? '' : 'none';
+            const needVerify = loggedIn && cloud.user && cloud.user.emailVerified === false
+                && cloud.user.providerData[0] && cloud.user.providerData[0].providerId === 'password';
+            document.getElementById('syncVerifyBtn').style.display = needVerify ? '' : 'none';
         }
 
         async function cloudInit() {
@@ -7501,6 +7603,8 @@ theme: 'system',
                 cloud.fs = fsMod;
                 cloud.ready = true;
                 cloudWireAuthUi(authMod);
+                // завершение Google-входа через redirect
+                authMod.getRedirectResult(cloud.auth).catch(() => {});
                 authMod.onAuthStateChanged(cloud.auth, (user) => {
                     cloud.user = user;
                     cloudSetAuthUi(!!user);
