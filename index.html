@@ -4672,8 +4672,8 @@ theme: 'system',
             // вернуть страницу ровно туда, где она была
             const scrollBefore = window.scrollY;
             calendarDayFilter = f;
-            if (f && searchRow.style.display !== 'none') setSearchOpen(false);
-            else updateEmptyMsg();
+            // поиск и фильтр дня работают вместе — поиск не закрываем
+            updateEmptyMsg();
             // страница не должна стать короче текущей прокрутки — распорка + возврат точки
             ensureCalendarScrollHeight(scrollBefore);
             window.scrollTo({ top: scrollBefore, behavior: 'auto' });
@@ -6479,11 +6479,6 @@ theme: 'system',
         // открыть/закрыть строку поиска активных задач (с очисткой фильтров)
         function setSearchOpen(open) {
             searchRow.style.display = open ? 'flex' : 'none';
-            if (open && calendarDayFilter) {
-                // поиск и день календаря не смешиваем
-                calendarDayFilter = null;
-                refreshTasksCalendar();
-            }
             if (!open) {
                 if (searchInput.value !== '') searchInput.value = '';
                 if (activeColorFilter !== null) {
