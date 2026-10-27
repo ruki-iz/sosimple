@@ -684,6 +684,8 @@
             z-index: 1002;
         }
         .task-text-editing:focus { outline: 1px solid var(--border-focus); }
+        /* поле редактирования остаётся белым при наведении (не синеет как карточка) */
+        .task-text-editing:hover { background-color: var(--bg-panel); }
         .edit-toolbar {
             display: flex;
             align-items: center;
@@ -1383,6 +1385,11 @@ font-size: 14px;
         .cal-cell.other-month .cal-num { color: var(--text-other-month); }
         .cal-cell.other-month.has-tasks { cursor: pointer; }
         .cal-cell.today .cal-num { font-weight: 700; color: var(--bg-calendar-today-text); }
+        /* мигание дня, куда перенеслась точка напоминания */
+        .cal-cell.cal-blink { animation: calBlink 1.5s ease; }
+        @keyframes calBlink { 0%, 45% { background-color: var(--accent-primary-bg); } 100% { background-color: transparent; } }
+        /* у сегодняшней клетки вместо числа слово «сегодня» */
+        .cal-cell.today .cal-num { font-size: 10px; letter-spacing: 0; line-height: 1.4; }
         .cal-cell.selected { border-color: var(--accent-primary); background: var(--accent-primary-bg); }
         .cal-dots { display: flex; gap: 3px; margin-top: 3px; flex-wrap: wrap; justify-content: center; max-width: 100%; padding: 0 2px; }
         .cal-dot { width: 7px; height: 7px; border-radius: 50%; box-sizing: border-box; }
@@ -1873,6 +1880,13 @@ font-size: 14px;
                     <option value="endofday" id="autoConfirmEndOfDay">В конце дня</option>
                 </select>
             </div>
+            <div class="settings-group">
+                <div>
+                    <label for="settingCalRows" id="calRowsLabel">Строк в календаре</label>
+                    <div class="settings-hint" id="calRowsHint">сколько недель задач показывать</div>
+                </div>
+                <input type="text" id="settingCalRows" inputmode="numeric" maxlength="1">
+            </div>
             <div class="settings-group settings-backup">
                 <label>Резервное копирование</label>
                 <div class="backup-buttons">
@@ -1946,6 +1960,7 @@ font-size: 14px;
         const settingRelativeTime = document.getElementById('settingRelativeTime');
         const settingNewTaskOnTop = document.getElementById('settingNewTaskOnTop');
         const settingAutoConfirm = document.getElementById('settingAutoConfirm');
+        const settingCalRows = document.getElementById('settingCalRows');
         const newTaskPositionBtn = document.getElementById('newTaskPositionBtn');
         const settingLanguage = document.getElementById('settingLanguage');
         const settingDeadlineAlert = document.getElementById('settingDeadlineAlert');
@@ -2008,7 +2023,8 @@ font-size: 14px;
         let currentNewTaskColor = null;
         let activeColorFilter = null;
         let completedColorFilter = null;
-        let calMonth = (function () { const d = new Date(); d.setDate(1); return d; })();
+        let calWeekOffset = 0; // сдвиг бегущего окна календаря в неделях
+        let calWindowStart = null; // стартовая дата текущего окна
         let calendarDayFilter = null;
         let expandedTasks = new WeakSet();       // развёрнутые свёрнутые-задачи (слабые ссылки)
         let resizeTimer = null;                  // дебаунс обработчика resize
@@ -2126,8 +2142,10 @@ font-size: 14px;
                 autoConfirmHint: 'по наступлении срока переносить на следующую дату',
                 autoConfirmOff: 'Выключено', autoConfirmOnTime: 'По наступлении времени',
                 autoConfirmEndOfDay: 'В конце дня',
+                calRowsLabel: 'Строк в календаре', calRowsHint: 'сколько недель задач показывать',
                 viewList: 'Список', viewCalendar: 'Календарь',
                 calToday: 'Сегодня', calNoDate: 'Без даты', calReset: 'Сбросить',
+                calTodayCell: 'сегодня',
                 calNewTaskHint: 'Новая задача на:',
                 taskOne: 'задача', taskFew: 'задачи', taskMany: 'задач',
                 repeatNone: 'Без повтора', repeatDaily: 'Ежедневно', repeatWeekdays: 'По будням',
@@ -2235,8 +2253,10 @@ collapseTask: 'Свернуть'
                 autoConfirmHint: 'when due, move to the next date',
                 autoConfirmOff: 'Off', autoConfirmOnTime: 'When due',
                 autoConfirmEndOfDay: 'At end of day',
+                calRowsLabel: 'Calendar rows', calRowsHint: 'how many weeks of tasks to show',
                 viewList: 'List', viewCalendar: 'Calendar',
                 calToday: 'Today', calNoDate: 'No date', calReset: 'Reset',
+                calTodayCell: 'today',
                 calNewTaskHint: 'New task on:',
                 taskOne: 'task', taskFew: 'tasks', taskMany: 'tasks',
                 repeatNone: 'No repeat', repeatDaily: 'Daily', repeatWeekdays: 'Weekdays',
@@ -2336,7 +2356,8 @@ theme: 'system',
             collapseActiveTasks: false,
             collapseHeightPx: 120,
             tasksView: 'list',
-            autoConfirmReminders: 'off'
+            autoConfirmReminders: 'off',
+            calRows: 5
 };
         let appSettings = { ...defaultSettings };
 
@@ -3296,6 +3317,8 @@ theme: 'system',
             document.getElementById('autoConfirmOff').textContent = t('autoConfirmOff');
             document.getElementById('autoConfirmOnTime').textContent = t('autoConfirmOnTime');
             document.getElementById('autoConfirmEndOfDay').textContent = t('autoConfirmEndOfDay');
+            document.getElementById('calRowsLabel').textContent = t('calRowsLabel');
+            document.getElementById('calRowsHint').textContent = t('calRowsHint');
             setIconLabel(listViewBtn, t('viewList'));
             setIconLabel(calendarViewBtn, t('viewCalendar'));
             document.getElementById('calTasksToday').title = t('calToday');
@@ -3502,8 +3525,9 @@ theme: 'system',
             settingNewTaskOnTop.checked = appSettings.newTaskOnTop;
             settingLanguage.value = appSettings.language || 'ru';
         settingDeadlineAlert.value = appSettings.deadlineAlertMinutes || 0;
-        settingAutoConfirm.value = appSettings.autoConfirmReminders || 'off';
-        updateNewTaskPositionBtn();
+            settingAutoConfirm.value = appSettings.autoConfirmReminders || 'off';
+            settingCalRows.value = appSettings.calRows || 5;
+            updateNewTaskPositionBtn();
             settingsModal.classList.add('active');
             // при открытии прокрутка всегда сверху
             settingsModal.querySelector('.modal-scroll').scrollTop = 0;
@@ -3985,6 +4009,24 @@ theme: 'system',
             saveSettings();
             // сменили режим — применяем сразу
             autoConfirmDueReminders();
+        });
+
+        settingCalRows.addEventListener('focus', function() {
+            this.dataset.saved = this.value;
+        });
+        settingCalRows.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 1);
+        });
+        settingCalRows.addEventListener('blur', function() {
+            let v = parseInt(this.value);
+            if (isNaN(v)) v = parseInt(this.dataset.saved) || 5;
+            v = Math.min(8, Math.max(2, v));
+            this.value = v;
+            if (appSettings.calRows !== v) {
+                appSettings.calRows = v;
+                saveSettings();
+                refreshTasksCalendar();
+            }
         });
 
         // ====================================================================
@@ -4509,35 +4551,30 @@ theme: 'system',
         function renderTasksCalendar() {
             if (!tasksCalendar || appSettings.tasksView !== 'calendar') return;
             const locale = localeStr();
-            const y = calMonth.getFullYear(), m = calMonth.getMonth();
-            document.getElementById('calTasksTitle').textContent = calMonth.toLocaleDateString(locale, { month: 'long' }) + ' ' + calMonth.getFullYear();
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            // бегущее окно: старт — понедельник прошлой недели (сегодня во 2-й строке),
+            // ‹ › листают по неделям, число строк — настройка
+            let start = new Date(today);
+            const dow = (start.getDay() + 6) % 7; // 0 = понедельник
+            start.setDate(start.getDate() - dow - 7 + calWeekOffset * 7);
+            calWindowStart = new Date(start);
+            const rows = Math.min(8, Math.max(2, appSettings.calRows || 5));
+            const end = new Date(start); end.setDate(end.getDate() + rows * 7 - 1); end.setHours(23, 59, 59, 999);
+            const fmt = { day: 'numeric', month: 'short' };
+            document.getElementById('calTasksTitle').textContent =
+                start.toLocaleDateString(locale, fmt) + ' – ' + end.toLocaleDateString(locale, fmt);
             const wd = [];
             const monday = new Date(2024, 0, 1);
             for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(monday.getDate() + i); wd.push(d.toLocaleDateString(locale, { weekday: 'narrow' })); }
             document.getElementById('calTasksWeekdays').innerHTML = wd.map(x => '<div class="cal-weekday">' + x + '</div>').join('');
 
-            const monthStart = new Date(y, m, 1);
-            const monthEnd = new Date(y, m + 1, 0, 23, 59, 59);
-            // диапазон сетки с запасом: точки нужны и на днях соседних месяцев
-            const rangeStart = new Date(monthStart); rangeStart.setDate(rangeStart.getDate() - 7);
-            const rangeEnd = new Date(monthEnd); rangeEnd.setDate(rangeEnd.getDate() + 7);
-            const items = collectCalendarItems(rangeStart, rangeEnd);
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            let off = monthStart.getDay() - 1; if (off < 0) off = 6;
-            const daysInMonth = monthEnd.getDate();
-            const daysPrev = new Date(y, m, 0).getDate();
+            const items = collectCalendarItems(start, end);
             const grid = document.getElementById('calTasksDays');
             grid.innerHTML = '';
-            // рендерим только нужные строки сетки — без пустого низа
-            const rows = Math.ceil((off + daysInMonth) / 7);
             for (let i = 0; i < rows * 7; i++) {
-                let dayNum, cellDate, other = false;
-                if (i < off) { dayNum = daysPrev - off + i + 1; cellDate = new Date(y, m - 1, dayNum); other = true; }
-                else if (i >= off + daysInMonth) { dayNum = i - off - daysInMonth + 1; cellDate = new Date(y, m + 1, dayNum); other = true; }
-                else { dayNum = i - off + 1; cellDate = new Date(y, m, dayNum); }
+                const cellDate = new Date(start); cellDate.setDate(cellDate.getDate() + i);
                 const cell = document.createElement('div');
                 cell.className = 'cal-cell';
-                if (other) cell.classList.add('other-month');
                 if (cellDate < today) cell.classList.add('cal-past');
                 if (calendarDayFilter && calendarDayFilter.type === 'day' &&
                     calendarDayFilter.y === cellDate.getFullYear() &&
@@ -4549,7 +4586,11 @@ theme: 'system',
                 cell.dataset.d = cellDate.getDate();
                 const num = document.createElement('span');
                 num.className = 'cal-num';
-                num.textContent = dayNum;
+                if (cellDate.getTime() === today.getTime()) {
+                    num.textContent = t('calTodayCell');
+                } else {
+                    num.textContent = cellDate.getDate();
+                }
                 cell.appendChild(num);
                 const list = items[cellDate.getFullYear() + '-' + cellDate.getMonth() + '-' + cellDate.getDate()] || [];
                 if (list.length) {
@@ -4578,10 +4619,6 @@ theme: 'system',
                 }
                 grid.appendChild(cell);
             }
-            // назад текущего месяца не листаем
-            const prevBtn = document.getElementById('calTasksPrev');
-            const atCurrentMonth = y === today.getFullYear() && m === today.getMonth();
-            prevBtn.style.opacity = atCurrentMonth ? '0.25' : '';
             renderCalFooter();
         }
 
@@ -4602,6 +4639,32 @@ theme: 'system',
                 document.querySelector('.panel-tasks').appendChild(spacer);
             }
             spacer.style.height = Math.round((parseFloat(spacer.style.height) || 0) + deficit) + 'px';
+        }
+
+        // после изменения дедлайна: убрать карточку из выбранного дня,
+        // обновить точки и мигнуть днём, куда встала точка напоминания
+        function calendarAfterDeadlineChange(newDs, allowBlink) {
+            if (calendarDayFilter) applySearch();
+            if (appSettings.tasksView !== 'calendar') return;
+            refreshTasksCalendar();
+            if (!newDs || !calendarDayFilter) return;
+            const nd = new Date(newDs); nd.setHours(0, 0, 0, 0);
+            const rows = Math.min(8, Math.max(2, appSettings.calRows || 5));
+            if (!calWindowStart) return;
+            const wS = new Date(calWindowStart);
+            const wE = new Date(wS); wE.setDate(wE.getDate() + rows * 7 - 1);
+            // если новая дата вне окна — сдвинуть окно, чтобы день был виден
+            if (nd < wS) { calWeekOffset -= Math.ceil((wS - nd) / (7 * 86400000)); renderTasksCalendar(); }
+            else if (nd > wE) { calWeekOffset += Math.ceil((nd - wE) / (7 * 86400000)); renderTasksCalendar(); }
+            const cell = Array.from(document.querySelectorAll('#calTasksDays .cal-cell')).find(c =>
+                +c.dataset.y === nd.getFullYear() && +c.dataset.m === nd.getMonth() && +c.dataset.d === nd.getDate());
+            if (cell) {
+                cell.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if (allowBlink !== false) {
+                    cell.classList.add('cal-blink');
+                    setTimeout(() => cell.classList.remove('cal-blink'), 1600);
+                }
+            }
         }
 
         function setCalendarFilter(f) {
@@ -4638,8 +4701,7 @@ theme: 'system',
             saveSettings();
             updateTasksViewUI();
             if (mode === 'calendar') {
-                const d = new Date(); d.setDate(1);
-                calMonth = d;
+                calWeekOffset = 0;
                 renderTasksCalendar();
             } else {
                 setCalendarFilter(null);
@@ -4653,19 +4715,15 @@ theme: 'system',
             listViewBtn.addEventListener('click', () => setTasksView('list'));
             calendarViewBtn.addEventListener('click', () => setTasksView('calendar'));
             document.getElementById('calTasksPrev').addEventListener('click', () => {
-                // назад текущего месяца не листаем
-                const now = new Date();
-                if (calMonth.getFullYear() === now.getFullYear() && calMonth.getMonth() === now.getMonth()) return;
-                calMonth.setMonth(calMonth.getMonth() - 1);
+                calWeekOffset -= 1;
                 renderTasksCalendar();
             });
             document.getElementById('calTasksNext').addEventListener('click', () => {
-                calMonth.setMonth(calMonth.getMonth() + 1);
+                calWeekOffset += 1;
                 renderTasksCalendar();
             });
             document.getElementById('calTasksToday').addEventListener('click', () => {
-                const d = new Date(); d.setDate(1);
-                calMonth = d;
+                calWeekOffset = 0;
                 renderTasksCalendar();
             });
             document.getElementById('calTasksDays').addEventListener('click', e => {
@@ -6129,9 +6187,8 @@ theme: 'system',
                 updateDeadlineStatus(li, target.toISOString(), false);
                 sortTasks();
                 saveTasks();
-                li.classList.add('appearing');
-                setTimeout(() => li.classList.remove('appearing'), 1500);
                 checkDeadlineAlerts();
+                calendarAfterDeadlineChange(target.toISOString(), !silent);
                 setTimeout(() => { if (!silent) li.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 100);
             };
             if (current <= new Date()) { perform(); return; }
@@ -7158,6 +7215,8 @@ theme: 'system',
             }, 100);
 
             closeDeadlineModal();
+            // календарь: точка переезжает на новый день, карточка уходит из выбранного дня
+            calendarAfterDeadlineChange(ds);
         }
 
         // снять дедлайн (и повтор — без дедлайна повторять нечего)
@@ -7206,6 +7265,8 @@ theme: 'system',
             }, 100);
 
             closeDeadlineModal();
+            // календарь: точка с прежнего дня исчезает
+            calendarAfterDeadlineChange(null);
         }
 
         function updateDateDisplay(el) {
