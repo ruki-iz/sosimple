@@ -171,11 +171,12 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 6px 20px 15px;
+            padding: 6px 10px 15px;
             transition: background-color 0.3s, color 0.3s;
             overflow-x: hidden;
         }
         body.modal-open { overflow: hidden; }
+        html, body { overflow-anchor: none; }
         .panel {
             background: var(--bg-panel);
             padding: 10px;
@@ -201,9 +202,8 @@
             min-height: 32px;
         }
         .header-row h1 {
-            position: absolute;
-            left: 0;
-            right: 0;
+            flex: 1 1 auto;
+            min-width: 0;
             text-align: left;
             color: var(--text-primary);
             margin: 0;
@@ -327,7 +327,10 @@
         }
         #taskInput {
             width: 100%;
-            padding: 6px 11px 6px 11px;
+            /* правый отступ 15px — зона красного крестика очистки; суммарные
+               боковые отступы дают ширину текста P−32 — ровно как у текста
+               карточки задачи (метка 4px + паддинги 12px) */
+            padding: 6px 15px 6px 11px;
             border: none;
             border-radius: 0 4px 4px 0;
             font-size: var(--task-font-size, 14px);
@@ -351,6 +354,41 @@
             border-color: var(--text-danger);
             background-color: var(--bg-input-error);
         }
+        /* красный крестик очистки поля: живёт в правом отступе textarea (15px),
+           расширенная зона нажатия залезает на край текста — намеренно */
+        .input-clear-btn {
+            position: absolute;
+            top: 50%;
+            right: 1px;
+            transform: translateY(-50%);
+            width: 15px;
+            height: 28px;
+            border: none;
+            background: none;
+            color: var(--text-danger);
+            font-size: 13px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .input-clear-btn::before {
+            content: '';
+            position: absolute;
+            left: -7px;
+            right: -7px;
+            top: -7px;
+            bottom: -7px;
+        }
+        .input-clear-btn:hover { background: var(--accent-black-hover); }
+        .input-wrapper.has-text .input-clear-btn { display: flex; }
+        /* при выбранном повторе метка справа — крестик смещается влево от неё,
+           а не прячется (очистка поля нужна в любом состоянии) */
+        .input-wrapper.repeat-pending .input-clear-btn { right: 5px; }
         .char-counter {
             font-size: 11px;
             color: var(--text-muted);
@@ -511,6 +549,9 @@
         li.appearing { animation: slideIn 0.4s ease, highlightNew 1.5s ease; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes highlightNew { 0%, 25% { background-color: var(--bg-highlight-new); } 100% { background-color: var(--bg-task); } }
+        /* закрепление/открепление: оригинал остаётся на месте —
+           только мягкая подсветка фоном, без slideIn (выглядит как скачок) */
+        li.just-pinned { animation: highlightNew 1.5s ease; }
 
         li:not(.completed)::before {
             content: '';
@@ -564,31 +605,6 @@
             background-color: var(--bg-task-overdue);
             border-color: var(--text-danger);
         }
-        /* кнопка «Вернуться»: на компьютере встаёт по вертикали на уровень курсора,
-           на сенсорных — внизу по центру; стрелка показывает направление возврата */
-        #scrollBackBtn {
-            position: fixed;
-            bottom: 22px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            padding: 9px 18px;
-            border: none;
-            border-radius: 22px;
-            background: var(--accent-primary);
-            color: #ffffff;
-            font-size: 13px;
-            font-weight: 600;
-            box-shadow: var(--shadow-modal);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.25s;
-            z-index: 1500;
-            cursor: pointer;
-        }
-        #scrollBackBtn.show { opacity: 1; pointer-events: auto; }
 
 
         @keyframes dropIndicatorFadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -656,6 +672,14 @@
             overflow: hidden;
             -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
             mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+        }
+        /* найденный фрагмент при поиске: без горизонтальных паддингов —
+           иначе метки добавляют ширину и ломают перенос строк относительно
+           той же задачи без подсветки */
+        mark.search-hit {
+            background-color: rgba(255, 193, 7, 0.45);
+            color: inherit;
+            border-radius: 2px;
         }
         .collapse-toggle {
             background: none;
@@ -859,6 +883,16 @@
         .info-popup .info-row { display: flex; gap: 12px; justify-content: space-between; padding: 2px 0; }
         .info-popup .info-label { color: var(--text-muted); white-space: nowrap; }
         .info-popup .info-value { text-align: right; }
+        .info-popup .info-popup-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-default); }
+        .info-popup .info-popup-btn {
+            background: var(--bg-input); color: var(--text-primary);
+            border: 1px solid var(--border-input); border-radius: 6px;
+            padding: 4px 10px; font-size: 12px; cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .info-popup .info-popup-btn:hover { border-color: var(--text-secondary); }
+        .info-popup .info-popup-btn.primary { border-color: var(--accent-primary); color: var(--accent-primary); font-weight: 600; }
+        .info-popup .info-popup-btn.primary:hover { filter: brightness(1.15); }
         .deadline-display {
             font-size: 12px;
             color: var(--text-secondary);
@@ -892,6 +926,7 @@
             color: var(--text-primary);
         }
         .action-btn:hover { opacity: 1; }
+        .pin-btn { color: var(--text-secondary); }
         .deadline-btn { color: var(--text-secondary); }
         .deadline-btn:hover { background-color: var(--accent-primary-bg); color: var(--accent-primary); }
         .delete-btn { color: var(--text-secondary); }
@@ -999,7 +1034,6 @@
         .custom-scrollbar .cs-thumb:hover,
         .custom-scrollbar.dragging .cs-thumb { background: var(--scrollbar-thumb-hover); }
         .modal-empty-msg { text-align: center; color: var(--text-muted); font-style: italic; padding: 20px; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .modal-header h3 { margin: 0; color: var(--text-primary); }
         .modal-close-btn {
             background: none;
@@ -1202,6 +1236,19 @@ font-size: 14px;
         }
         .picker-sep { font-size: 20px; font-weight: 700; color: var(--text-muted); align-self: center; padding-bottom: 2px; }
         .picker-divider { width: 1px; height: 50px; background: var(--border-divider); margin: 0 12px; align-self: center; }
+        /* на узких экранах строка даты/времени модалки (≈360px) шире контентной
+           части окна (90% ширины минус паддинг) и торчит за края экрана —
+           сжимаем элементы, сохраняя одну строку */
+        @media (max-width: 480px) {
+            .picker-row-compact { gap: 2px; }
+            .calendar-trigger-btn { width: 34px; height: 34px; margin-right: 4px; }
+            .calendar-trigger-btn svg { width: 34px; height: 34px; }
+            .spinner-input-compact { width: 30px; }
+            .spinner-input-compact.wide { width: 50px; }
+            .picker-divider { margin: 0 5px; }
+            .picker-sep { font-size: 18px; }
+        }
+
         
         .calendar-trigger-btn {
             background: none;
@@ -1248,11 +1295,26 @@ font-size: 14px;
             padding: 2px 10px;
             border-radius: 4px;
             line-height: 1;
-            transition: all 0.2s;
+            /* visibility не в списке: переход по ней (через all) держит
+               computed-значение и мешает показу/скрытию кнопки возврата */
+            transition: color 0.2s, border-color 0.2s, background-color 0.2s, opacity 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
-        .calendar-nav-btn:hover { background: var(--accent-primary-bg); color: var(--accent-primary); }
+        /* hover только при настоящем наведении: на сенсорных экранах
+           он иначе «залипает» после нажатия */
+        @media (hover: hover) {
+            .calendar-nav-btn:hover { background: var(--accent-primary-bg); color: var(--accent-primary); }
+        }
+        /* неактивная кнопка листания: серая, без подсветки наведения */
+        .calendar-nav-btn:disabled {
+            color: var(--text-muted);
+            opacity: 0.45;
+            background: none;
+            cursor: default;
+        }
         .calendar-month-year { font-size: 14px; font-weight: 600; color: var(--text-primary); text-transform: capitalize; cursor: pointer; user-select: none; -webkit-user-select: none; }
-        .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+        .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 2px; }
         .calendar-weekday { text-align: center; font-size: 11px; color: var(--text-muted); font-weight: 600; padding: 4px 0; text-transform: capitalize; }
         .calendar-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; flex: 1; min-height: 0; grid-auto-rows: 1fr; }
         .calendar-day {
@@ -1270,6 +1332,8 @@ font-size: 14px;
         }
         .calendar-day:hover { background: var(--accent-primary-bg); color: var(--accent-primary); }
         .calendar-day.other-month { color: var(--text-other-month); }
+        /* дни следующего месяца — чуть темнее дней предыдущего */
+        .calendar-day.other-month.next-month { color: var(--text-other-month-hover); }
         .calendar-day.other-month:hover { background: var(--accent-black-light); color: var(--text-other-month-hover); }
         .calendar-day.today { font-weight: 700; color: var(--bg-calendar-today-text); }
         .calendar-day.selected { background: var(--bg-calendar-selected); color: white; font-weight: 600; }
@@ -1359,13 +1423,6 @@ font-size: 14px;
             outline: none;
         }
         .repeat-btn.selected input { background: rgba(255, 255, 255, 0.25); color: white; }
-        .task-repeat-icon {
-            color: var(--text-muted);
-            display: inline-flex;
-            align-items: center;
-            opacity: 0.8;
-            user-select: none;
-        }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: relative; }
         /* ошибки окна дедлайна: в пустом зазоре между заголовком и ячейками,
            поверх него — место не увеличиваем */
@@ -1396,8 +1453,25 @@ font-size: 14px;
         .modal-btn.danger:hover { background-color: #c82333; }
         .empty-msg { text-align: center; color: var(--text-muted); font-style: italic; }
         .search-row { display: flex; align-items: center; gap: 6px; margin: 0 6px 8px 6px; }
-        /* строка поиска в блоке создания: на всю ширину, как поле задачи */
-        .input-container .search-row { margin: 0 0 2px 0; }
+        /* Строка поиска в блоке создания: на её месте, как поле задачи */
+        /* Стабильная высота панели при переключении поля задачи ↔ поиск:
+           оба живут в одной grid-ячейке, а скрываемые строки (палитра,
+           счётчик, кнопки) прячутся через visibility, поэтому список
+           задач под панелью не прыгает ни на телефоне, ни на десктопе */
+        .input-container {
+            display: grid;
+            grid-template-areas: "palette" "swap" "counter" "buttons";
+        }
+        .input-container .color-palette { grid-area: palette; }
+        .input-container .input-wrapper,
+        .input-container .search-row { grid-area: swap; }
+        .input-container .char-counter { grid-area: counter; }
+        .input-container .input-buttons { grid-area: buttons; }
+        .input-container .search-row { margin: 0; }
+        .input-container .search-row input {
+            height: 32px;
+            box-sizing: border-box;
+        }
         /* переключатель вида списка: список / календарь */
         /* три блока активных задач: закреплённые / дедлайны / без дедлайна.
            Обёртка повторяет размеры панели (иначе на широких окнах блоки
@@ -1406,8 +1480,8 @@ font-size: 14px;
         /* липкая полоска чипов: при прокрутке прилипает к верхнему краю
            и всегда под рукой; чипы прижаты вправо, чтобы не закрывать
            начало текста задач. Позиция (sticky/static) — из applyBlockNavMode */
-        #blockNav, .block-nav-strip { display: flex; justify-content: flex-end; gap: 6px; width: 100%; max-width: 520px; margin: 6px auto 0; padding: 0; z-index: 90; }
-        #blockNav.tail-space, .panel-tasks.tail-space { margin-bottom: calc(100vh / 5); }
+        .block-nav-strip { display: flex; justify-content: flex-end; gap: 6px; width: 100%; max-width: 520px; margin: 6px auto 0; padding: 0; z-index: 90; }
+        .panel-tasks.tail-space, .block-nav-strip.tail-space { margin-bottom: calc(100vh / 5); }
         /* кнопка «наверх» на полоске */
         .block-nav-top { margin-left: 0; }
         .block-nav-btn {
@@ -1416,9 +1490,17 @@ font-size: 14px;
             border: 1px solid var(--border-input); border-radius: 14px;
             padding: 3px 10px; font-size: 12px; cursor: pointer;
             transition: color 0.2s, border-color 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
-        .block-nav-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+        /* hover только при настоящем наведении: на сенсорных экранах
+           он иначе «залипает» после тапа */
+        @media (hover: hover) {
+            .block-nav-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+        }
         .block-nav-btn.current { color: var(--accent-primary); border-color: var(--accent-primary); }
+        /* значок пина в чипах полосок: наклонён и опущен, как булавка */
+        .pin-chip-icon { vertical-align: -0.15em; margin-right: -2px; transform: translateY(2px) rotate(35deg); }
         .block-nav-count { font-weight: 700; }
         #tasksBlocks { width: 100%; max-width: 520px; margin: 0 auto; }
         .panel-tasks ul { list-style: none; margin: 0; padding: 0; }
@@ -1426,39 +1508,40 @@ font-size: 14px;
            остаётся одинаковый паддинг панели (10px) */
         #tasksBlocks li:last-child { margin-bottom: 0; }
         .cal-head {
-            display: flex; align-items: center; justify-content: center; gap: 4px;
+            display: flex; align-items: center; gap: 4px;
             padding: 0 6px 6px; position: relative;
         }
+        /* дата с листанием недели слева; авто-отступ перед «−» прижимает
+           −/+ числа строк к правому краю шапки.
+           «К текущей неделе» скрыта в самом CSS: до первого renderTasksCalendar
+           она не нужна, иначе вспыхивает при загрузке страницы */
+        #calRowsMinus { margin-left: auto; }
+        #calTasksToday { visibility: hidden; }
         .cal-day-clear {
-            position: absolute; right: 0;
             background: none; border: none; cursor: pointer;
             color: var(--text-secondary); font-size: 14px;
             width: 30px; height: 26px; padding: 0;
             display: inline-flex; align-items: center; justify-content: center;
             border-radius: 4px; transition: all 0.2s;
+            /* слот крестика зарезервирован (visibility, не display):
+               при выборе дня −/+ не сдвигаются */
+            visibility: hidden;
         }
         .cal-day-clear:hover { background: var(--accent-black-hover); color: var(--text-primary); }
         #emptyPanel .empty-msg { margin: 8px 0; }
         .tasks-calendar { padding: 0 6px 8px 6px; }
-        .cal-title { font-size: 14px; font-weight: 600; color: var(--text-primary); min-width: 108px; text-align: center; user-select: none; -webkit-user-select: none; }
-        .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+        .cal-title { font-size: 14px; color: var(--text-primary); min-width: 108px; text-align: center; user-select: none; -webkit-user-select: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* на узких экранах заголовку диапазона разрешаем сжиматься (многоточие),
+           кнопки шапки слегка ужимаются — иначе крестик выдавливается за край */
+        @media (max-width: 480px) {
+            .cal-head { gap: 2px; }
+            .cal-title { min-width: 0; }
+            .calendar-nav-btn { padding-left: 6px; padding-right: 6px; }
+            .cal-day-clear { width: 24px; }
+        }
+        .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 2px; }
         .cal-weekday { text-align: center; font-size: 11px; color: var(--text-muted); font-weight: 600; padding: 2px 0; text-transform: capitalize; }
         .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-        .cal-rows-spin { display: flex; align-items: center; gap: 4px; }
-        .cal-rows-btn {
-            width: 28px; height: 28px; border: 1px solid var(--border-input);
-            border-radius: 6px; background: var(--bg-input); color: var(--text-primary);
-            font-size: 15px; line-height: 1; cursor: pointer; transition: border-color 0.2s, color 0.2s;
-        }
-        .cal-rows-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
-        .cal-rows-btn:active { background: var(--accent-black-hover); }
-        #settingCalRows {
-            width: 34px; text-align: center; padding: 4px 2px;
-            border: 2px solid var(--border-input); border-radius: 6px;
-            font-size: 14px; color: var(--text-primary);
-            background: var(--bg-input); cursor: default; user-select: none;
-            -webkit-user-select: none; pointer-events: none;
-        }
         .cal-cell {
             min-height: 20px;
             display: flex; flex-direction: column; align-items: center;
@@ -1483,11 +1566,39 @@ font-size: 14px;
         /* размеры кратны 4px: при масштабировании Windows 100/125/150/200%
            элемент занимает целое число физических пикселей — без «овалов» */
         .cal-dot { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; flex: none; }
-        /* вхождение напоминания — «пончик»: кольцо цвета метки, середина под панель */
-        .cal-dot.repeat { width: 12px; height: 12px; background: var(--bg-panel); border: 3px solid var(--bg-panel); }
+        /* вхождение напоминания — «пончик»: кольцо цвета метки, середина
+           прозрачная — сквозь неё виден фон дня (в т.ч. выделение дня) */
+        .cal-dot.repeat { width: 12px; height: 12px; background: transparent; border: 3px solid var(--bg-panel); }
         /* прошедшие дни приглушены */
         .cal-cell.cal-past .cal-num { color: var(--text-other-month); }
         .cal-cell.cal-past .cal-dot { opacity: 0.4; }
+        /* выбранный день под курсором: вместо фона — красный крест (две
+           диагонали), крестик сброса подсвечен синхронно (связка через
+           reset-hover, JS в initTasksCalendar). Длина линий подобрана так,
+           чтобы кончики выходили за рамку буквально на треть прежнего */
+        .cal-cell { position: relative; }
+        .cal-cell.selected::before,
+        .cal-cell.selected::after {
+            content: '';
+            display: none;
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 93.5%; height: 2px;
+            background: var(--text-danger);
+            border-radius: 1px;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .cal-cell.selected::after { transform: translate(-50%, -50%) rotate(45deg); }
+        .cal-cell.selected::before { transform: translate(-50%, -50%) rotate(-45deg); }
+        @media (hover: hover) {
+            .cal-cell.selected.has-tasks:hover { background: var(--accent-primary-bg); }
+            .cal-cell.selected.reset-hover::after,
+            .cal-cell.selected.reset-hover::before,
+            .cal-cell.selected:hover::after,
+            .cal-cell.selected:hover::before { display: block; }
+            .cal-day-clear.reset-hover { background: var(--accent-black-hover); color: var(--text-primary); }
+        }
         .cal-more { font-size: 9px; color: var(--text-muted); line-height: 1; margin-left: 2px; align-self: center; flex: none; }
         #completedSearchRow, #trashSearchRow { margin-top: -8px; }
         /* строка поиска поднята на 8px — компенсируем, чтобы палитра не прилипала к полю */
@@ -1708,6 +1819,7 @@ font-size: 14px;
             <div class="input-wrapper" id="inputWrapper">
                 <div class="input-color-indicator" id="inputColorIndicator"></div>
                 <textarea id="taskInput" placeholder="Что нужно сделать?" rows="1" spellcheck="true" lang="ru" autocapitalize="sentences" enterkeyhint="enter"></textarea>
+                <button type="button" id="taskInputClear" class="input-clear-btn" title="Очистить поле" aria-label="Очистить поле">✕</button>
             </div>
             <!-- поиск живёт в блоке создания: поле задачи заменяется полем поиска,
                  дедлайн и «+» прячутся, общая палитра переключается на фильтр по цвету -->
@@ -1725,7 +1837,7 @@ font-size: 14px;
     </div>
 
     <!-- быстрые переходы между блоками задач: чипы с счётчиками -->
-    <div id="blockNav" style="display: none;">
+    <div class="block-nav-strip" id="blockNav" style="display: none;">
         <button type="button" class="block-nav-btn" id="navPinned" style="display: none;"></button>
         <button type="button" class="block-nav-btn" id="navDeadline" style="display: none;"></button>
         <button type="button" class="block-nav-btn" id="navNoDeadline" style="display: none;"></button>
@@ -1738,11 +1850,13 @@ font-size: 14px;
     <div class="block-nav-strip" id="blockNavMid1" style="display: none;"></div>
     <div class="panel panel-tasks" id="deadlinePanel" style="display: none;">
     <div class="cal-head" id="calTasksHead">
+        <button class="calendar-nav-btn" id="calTasksToday" tabindex="-1">•</button>
         <button class="calendar-nav-btn" id="calTasksPrev" tabindex="-1"><</button>
         <span class="cal-title" id="calTasksTitle"></span>
-        <button class="calendar-nav-btn" id="calTasksToday" tabindex="-1">•</button>
         <button class="calendar-nav-btn" id="calTasksNext" tabindex="-1">></button>
-        <button class="cal-day-clear" id="calDayClear" style="display: none;"></button>
+        <button class="calendar-nav-btn" id="calRowsMinus" tabindex="-1" aria-label="Меньше строк">−</button>
+        <button class="calendar-nav-btn" id="calRowsPlus" tabindex="-1" aria-label="Больше строк">+</button>
+        <button class="cal-day-clear" id="calDayClear">✕</button>
     </div>
     <div class="tasks-calendar" id="tasksCalendar">
         <div class="cal-weekdays" id="calTasksWeekdays"></div>
@@ -1949,6 +2063,13 @@ font-size: 14px;
                 <input type="checkbox" id="settingRelativeTime">
             </div>
             <div class="settings-group">
+                <div>
+                    <label for="settingSearchWhileTyping" id="searchWhileTypingLabel">Поиск из окна новой задачи</label>
+                    <div class="settings-hint" id="searchWhileTypingHint">Набор текста ищет по списку; выбранная цветная метка фильтрует сразу</div>
+                </div>
+                <input type="checkbox" id="settingSearchWhileTyping">
+            </div>
+            <div class="settings-group">
                 <label id="newTasksLabel">Новые задачи без дедлайна</label>
                 <button type="button" class="new-task-position-btn" id="newTaskPositionBtn">в конец</button>
             </div>
@@ -1975,17 +2096,6 @@ font-size: 14px;
                     <option value="ontime" id="autoConfirmOnTime">По наступлении времени</option>
                     <option value="endofday" id="autoConfirmEndOfDay">В конце дня</option>
                 </select>
-            </div>
-            <div class="settings-group">
-                <div>
-                    <label for="settingCalRows" id="calRowsLabel">Строк в календаре</label>
-                    <div class="settings-hint" id="calRowsHint">сколько недель задач показывать</div>
-                </div>
-                <div class="cal-rows-spin">
-                    <button type="button" class="cal-rows-btn" id="calRowsMinus" aria-label="Меньше">−</button>
-                    <input type="text" id="settingCalRows" inputmode="numeric" maxlength="1" readonly tabindex="-1">
-                    <button type="button" class="cal-rows-btn" id="calRowsPlus" aria-label="Больше">+</button>
-                </div>
             </div>
             <div class="settings-group">
                 <div>
@@ -2032,11 +2142,6 @@ font-size: 14px;
             </div>
         </div>
     </div>
-    <!-- возврат к прежнему месту списка после пересортировки -->
-    <button type="button" id="scrollBackBtn">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
-        <span id="scrollBackLabel">Вернуться</span>
-    </button>
 
     <script>
         // ====================================================================
@@ -2070,6 +2175,7 @@ font-size: 14px;
         const settingsModal = document.getElementById('settingsModal');
         const settingCompletedDays = document.getElementById('settingCompletedDays');
         const settingTrashDays = document.getElementById('settingTrashDays');
+        const settingSearchWhileTyping = document.getElementById('settingSearchWhileTyping');
         const settingMaxTaskLength = document.getElementById('settingMaxTaskLength');
         const settingTaskFontSize = document.getElementById('settingTaskFontSize');
         const settingTheme = document.getElementById('settingTheme');
@@ -2077,7 +2183,6 @@ font-size: 14px;
         const settingNewTaskOnTop = document.getElementById('settingNewTaskOnTop');
         const settingAutoConfirm = document.getElementById('settingAutoConfirm');
         const settingBlockNav = document.getElementById('settingBlockNav');
-        const settingCalRows = document.getElementById('settingCalRows');
         const newTaskPositionBtn = document.getElementById('newTaskPositionBtn');
         const settingLanguage = document.getElementById('settingLanguage');
         const settingDeadlineAlert = document.getElementById('settingDeadlineAlert');
@@ -2096,6 +2201,7 @@ font-size: 14px;
         const searchClearBtn = document.getElementById('searchClearBtn');
         const searchEmptyMsg = document.getElementById('searchEmptyMsg');
         const inputWrapper = document.getElementById('inputWrapper');
+        const taskInputClear = document.getElementById('taskInputClear');
         const inputButtons = document.getElementById('inputButtons');
         const taskInputCounter = document.getElementById('taskInputCounter');
         const completedFilterPalette = document.getElementById('completedFilterPalette');
@@ -2215,7 +2321,6 @@ font-size: 14px;
         //  SVG-иконки
         // ====================================================================
         const PLUS_SVG = '<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
-        const LOCK_SVG = '<svg width="0.8em" height="0.8em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em; margin-right: -2px"><rect x="5" y="11" width="14" height="11" rx="2" ry="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path><circle cx="12" cy="16" r="1" fill="currentColor"></circle></svg>';
         const CALENDAR_SVG = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>';
         const CLOCK_SVG = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
         const TRASH_SVG = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
@@ -2228,7 +2333,7 @@ font-size: 14px;
         const ERASER_SVG = '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16c-1-1-1-2 0-3l9-9c1-1 2-1 3 0l5 5c1 1 1 2 0 3l-8 8"/><line x1="6" y1="11" x2="13" y2="18"/></svg>';
         const DEL_TEXT_SVG = '<svg width="1.2em" height="1.2em" viewBox="0 0 30 18" fill="currentColor"><text x="15" y="14" font-size="16" font-weight="bold" text-anchor="middle" font-family="sans-serif">DEL</text></svg>';
         const SEARCH_SVG = '<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
-        const PIN_ICON_SVG = '<svg width="0.8em" height="0.8em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em; margin-right:-2px; transform: translateY(2px) rotate(35deg)"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></svg>';
+        const PIN_ICON_SVG = '<svg class="pin-chip-icon" width="0.8em" height="0.8em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></svg>';
         const PIN_SVG = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></svg>';
         const CHEVRON_SVG = '<svg width="14px" height="14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"></polyline></svg>';
         const REPEAT_ICON_SVG = '<svg width="0.8em" height="0.8em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>';
@@ -2237,6 +2342,7 @@ font-size: 14px;
         const BACKSPACE_SVG = '<svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>';
         const ARROW_UP_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
         const ARROW_DOWN_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
+        const RETURN_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5V20"/></svg>';
 
         // ====================================================================
         //  Переводы интерфейса (ru / en)
@@ -2248,6 +2354,7 @@ font-size: 14px;
                 dayMany: 'дней',
                 hourOne: 'час', hourFew: 'часа', hourMany: 'часов',
                 minuteOne: 'минута', minuteFew: 'минуты', minuteMany: 'минут',
+                minuteAgoOne: 'минуту', minuteAgoFew: 'минуты', minuteAgoMany: 'минут',
                 pageTitle: 'Мои задачи', placeholder: 'Что нужно сделать?', 
                 emptyList: 'Список пуст. Добавьте первую задачу!',
                 completedTitle: 'Выполненные задачи', noCompleted: 'Нет выполненных задач',
@@ -2268,6 +2375,8 @@ font-size: 14px;
                 taskFontSize: 'Размер шрифта в задачах',
                 relativeTime: 'Относительное время',
                 relativeTimeHint: '«5 мин назад» вместо «7 окт, 15:30»',
+                searchWhileTypingLabel: 'Поиск из окна новой задачи',
+                searchWhileTypingHint: 'Набор текста ищет по списку; выбранная цветная метка фильтрует сразу',
                 newTasks: 'Новые задачи без дедлайна', toBottom: 'в конец', toTop: 'в начало',
                 backup: 'Резервное копирование', exportBtn: 'Экспорт', importBtn: 'Импорт',
                 deleteAll: 'Удалить все данные', deleteAllHint: 'Задачи, корзина и настройки будут стёрты',
@@ -2283,18 +2392,22 @@ font-size: 14px;
                 searchClearClose: 'Очистить и закрыть',
                 repeatTitle: 'Повторение',
                 reminderDue: 'Наступило', reminderOkTitle: 'Подтвердить — на следующую дату',
+                reminderDue: 'Наступило', reminderOkTitle: 'Подтвердить — на следующую дату',
                 reminderMoveTo: 'Перенос на:', reminderCountLabel: 'Подтверждений:',
+                slotDue: 'Наступил слот', reminderConfirm: 'Подтвердить',
+                dayBeforeYesterday: 'позавчера', agoSuffix: 'назад',
+                hourAgoShort: 'ч.', minAgoShort: 'мин.', atPreposition: 'в',
                 lastPrefix: 'последний:', missedLabel: 'Пропущено:', missedShort: 'пропущено',
                 timeOne: 'раз', timeFew: 'раза', timeMany: 'раз',
                 autoConfirm: 'Автоматически подтверждать напоминания',
                 autoConfirmHint: 'по наступлении срока переносить на следующую дату',
                 autoConfirmOff: 'Выключено', autoConfirmOnTime: 'По наступлении времени',
                 autoConfirmEndOfDay: 'В конце дня',
-                calRowsLabel: 'Строк в календаре', calRowsHint: 'сколько недель задач показывать',
-            scrollBack: 'Вернуться',
+                calRowsLess: 'Меньше строк', calRowsMore: 'Больше строк',
                 viewList: 'Список', viewCalendar: 'Календарь',
-                calToday: 'Сегодня', calNoDate: 'Без даты', calReset: 'Сбросить', toTop: 'Наверх', toBottom: 'Вниз',
-                tasksOnDay: 'Задачи на',
+                calToday: 'К текущей неделе', calNoDate: 'Без даты', calReset: 'Сбросить', toTop: 'Наверх', toBottom: 'Вниз',
+                weekdaysShort: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+                tasksOnDay: 'Задачи на', tasksWithDeadline: 'Задачи с дедлайном',
                 blockNavLabel: 'Полоска чипов', blockNavHint: 'быстрые переходы между блоками задач',
                 blockNavFloating: 'Плавающая', blockNavBetween: 'Между блоками', blockNavOff: 'Выключено',
                 calTodayCell: 'сегодня',
@@ -2362,7 +2475,8 @@ collapseTask: 'Свернуть'
                dayFew: 'days',
                dayMany: 'days',
                hourOne: 'hour', hourFew: 'hours', hourMany: 'hours',
-               minuteOne: 'minute', minuteFew: 'minutes', minuteMany: 'minutes',
+                minuteOne: 'minute', minuteFew: 'minutes', minuteMany: 'minutes',
+                minuteAgoOne: 'minute', minuteAgoFew: 'minutes', minuteAgoMany: 'minutes',
                 pageTitle: 'My Tasks', placeholder: 'What needs to be done?', 
                 emptyList: 'List is empty. Add your first task!',
                 completedTitle: 'Completed tasks', noCompleted: 'No completed tasks',
@@ -2383,6 +2497,8 @@ collapseTask: 'Свернуть'
                 taskFontSize: 'Task font size',
                 relativeTime: 'Relative time',
                 relativeTimeHint: '"5 min ago" instead of "Oct 7, 15:30"',
+                searchWhileTypingLabel: 'Search from the new-task box',
+                searchWhileTypingHint: 'Typing searches the list; a picked color label filters at once',
                 newTasks: 'New tasks without deadline', toBottom: 'at the end', toTop: 'at the top',
                 backup: 'Backup', exportBtn: 'Export', importBtn: 'Import',
                 deleteAll: 'Delete all data', deleteAllHint: 'Tasks, trash and settings will be erased',
@@ -2399,17 +2515,20 @@ collapseTask: 'Свернуть'
                 repeatTitle: 'Repeat',
                 reminderDue: 'Due', reminderOkTitle: 'Confirm — snooze to next date',
                 reminderMoveTo: 'Snooze to:', reminderCountLabel: 'Confirmations:',
+                slotDue: 'Due slot', reminderConfirm: 'Confirm',
+                dayBeforeYesterday: '2 days ago', agoSuffix: 'ago',
+                hourAgoShort: 'h', minAgoShort: 'min', atPreposition: 'at',
                 lastPrefix: 'last:', missedLabel: 'Missed:', missedShort: 'missed',
                 timeOne: 'time', timeFew: 'times', timeMany: 'times',
                 autoConfirm: 'Auto-confirm reminders',
                 autoConfirmHint: 'when due, move to the next date',
                 autoConfirmOff: 'Off', autoConfirmOnTime: 'When due',
                 autoConfirmEndOfDay: 'At end of day',
-                calRowsLabel: 'Calendar rows', calRowsHint: 'how many weeks of tasks to show',
-            scrollBack: 'Back',
+                calRowsLess: 'Fewer rows', calRowsMore: 'More rows',
                 viewList: 'List', viewCalendar: 'Calendar',
-                calToday: 'Today', calNoDate: 'No date', calReset: 'Reset', toTop: 'Top', toBottom: 'Bottom',
-                tasksOnDay: 'Tasks on',
+                calToday: 'Back to current week', calNoDate: 'No date', calReset: 'Reset', toTop: 'Top', toBottom: 'Bottom',
+                weekdaysShort: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                tasksOnDay: 'Tasks on', tasksWithDeadline: 'Tasks with deadline',
                 blockNavLabel: 'Chip strip', blockNavHint: 'quick navigation between task blocks',
                 blockNavFloating: 'Floating', blockNavBetween: 'Between blocks', blockNavOff: 'Off',
                 calTodayCell: 'today',
@@ -2504,6 +2623,7 @@ collapseTask: 'Collapse'
             trashRetentionDays: 30,
             useRelativeTime: true,
             newTaskOnTop: false,
+            searchWhileTyping: true,
             language: (navigator.language || 'ru').startsWith('ru') ? 'ru' : 'en',
             deadlineAlertMinutes: 10,
             maxTaskLength: 350,
@@ -2520,7 +2640,8 @@ theme: 'system',
         function updateHeaderDate() {
             const now = new Date();
             const dateStr = now.toLocaleDateString(localeStr(), { weekday: 'long', day: 'numeric', month: 'short' });
-            const timeStr = now.toLocaleTimeString(localeStr(), { hour: '2-digit', minute: '2-digit' });
+            // 24h во всех локалях: AM/PM длинно и наезжает на кнопку поиска
+            const timeStr = now.toLocaleTimeString(localeStr(), { hour: '2-digit', minute: '2-digit', hour12: false });
             headerDate.textContent = `${dateStr.charAt(0).toUpperCase() + dateStr.slice(1)} • ${timeStr}`;
         }
 
@@ -2529,32 +2650,52 @@ theme: 'system',
         // ====================================================================
 
         // показывает на карточке 3-секундный отсчёт с отменой;
-        // если не отменить — выполняет performMove
+        // если не отменить — выполняет performMove.
+        // Отсчёт идёт сразу на всех карточках задачи: оригинале и клонах в закреплённых
+        function getTaskInstances(li) {
+            if (li.dataset.id) {
+                const esc = CSS.escape(li.dataset.id);
+                const found = [
+                    ...pinnedList.querySelectorAll('li[data-id="' + esc + '"]'),
+                    ...deadlineList.querySelectorAll('li[data-id="' + esc + '"]'),
+                    ...taskList.querySelectorAll('li[data-id="' + esc + '"]')
+                ];
+                if (found.length > 0) return found;
+            }
+            return [li]; // карточки вне активных списков (выполненные, корзина) всегда одна
+        }
+
         function scheduleMove(li, icon, message, performMove) {
-            if (li.classList.contains('pending-move')) return;
-            li.classList.add('pending-move');
-            const overlay = document.createElement('div');
-            overlay.className = 'task-overlay';
-            overlay.innerHTML = `<span class="overlay-icon">${icon}</span><span class="overlay-message">${message}</span><span class="overlay-timer">3</span><button class="overlay-cancel">${t('cancel')}</button>`;
-            li.appendChild(overlay);
-            const timerEl = overlay.querySelector('.overlay-timer');
-            const cancelBtn = overlay.querySelector('.overlay-cancel');
+            const instances = getTaskInstances(li);
+            if (instances.some(el => el.classList.contains('pending-move'))) return;
+            const overlays = instances.map(el => {
+                el.classList.add('pending-move');
+                const overlay = document.createElement('div');
+                overlay.className = 'task-overlay';
+                overlay.innerHTML = `<span class="overlay-icon">${icon}</span><span class="overlay-message">${message}</span><span class="overlay-timer">3</span><button class="overlay-cancel">${t('cancel')}</button>`;
+                el.appendChild(overlay);
+                return overlay;
+            });
             let secondsLeft = 3;
+            const stopCountdown = () => {
+                overlays.forEach(o => o.remove());
+                instances.forEach(el => el.classList.remove('pending-move'));
+            };
             const interval = setInterval(() => {
                 secondsLeft--;
-                timerEl.textContent = secondsLeft;
+                overlays.forEach(o => { o.querySelector('.overlay-timer').textContent = secondsLeft; });
                 if (secondsLeft <= 0) {
                     clearInterval(interval);
-                    overlay.remove();
-                    li.classList.remove('pending-move');
+                    stopCountdown();
                     performMove();
                 }
             }, 1000);
-            cancelBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                clearInterval(interval);
-                overlay.remove();
-                li.classList.remove('pending-move');
+            overlays.forEach(overlay => {
+                overlay.querySelector('.overlay-cancel').addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    clearInterval(interval);
+                    stopCountdown();
+                });
             });
         }
 
@@ -2618,6 +2759,10 @@ theme: 'system',
                 syncPaletteSelection();
 
                 inputColorIndicator.style.backgroundColor = `var(--task-color-${color || 'none'})`;
+                // метка управляет поиском из окна новой задачи: клик по цветной
+                // метке включает фильтр сразу (даже без текста), по серой —
+                // выключает и показывает все задачи
+                applyTypingSearch();
             });
 
             inputColorIndicator.style.backgroundColor = 'var(--task-color-none)';
@@ -2829,6 +2974,17 @@ theme: 'system',
                 const vv = window.visualViewport;
                 const viewportHeight = vv ? vv.height : window.innerHeight;
                 const viewportOffsetTop = vv ? vv.offsetTop : 0;
+                // Курсор уже в видимой зоне (с запасом на строку набора над
+                // клавиатурой) — центрировать не нужно: карточка была видна
+                // целиком, и рывок к центру только мешает
+                if (vv) {
+                    const topMargin = 40;
+                    const bottomMargin = 80;
+                    if (cursorYInLayoutViewport >= viewportOffsetTop + topMargin &&
+                        cursorYInLayoutViewport <= viewportOffsetTop + viewportHeight - bottomMargin) {
+                        return;
+                    }
+                }
                 const targetCursorY = viewportOffsetTop + viewportHeight / 2;
                 const scrollDelta = cursorYInLayoutViewport - targetCursorY;
                 const newScrollY = window.scrollY + scrollDelta;
@@ -3121,7 +3277,7 @@ theme: 'system',
                         setTimeout(() => { btnCopy.innerHTML = COPY_SVG; trackSelection(); }, 800);
                         return;
                     } catch (err) {
-                        console.log('Clipboard API failed, trying fallback...');
+                        // Clipboard API недоступен — переходим на execCommand
                     }
                 }
 
@@ -3164,7 +3320,7 @@ theme: 'system',
                             return;
                         }
                     } catch (err) {
-                        console.log('Clipboard read failed:', err.message);
+                        // чтение буфера запрещено — переходим на execCommand
                     }
                 }
                 
@@ -3173,7 +3329,8 @@ theme: 'system',
                     const success = document.execCommand('paste');
                     if (success) return;
                 } catch (err) {
-                    console.log('execCommand paste failed:', err);
+                    // execCommand('paste') обычно запрещён политикой — пользователь
+                    // вставит через Ctrl+V или меню редактирования
                 }
             });
 
@@ -3515,8 +3672,8 @@ theme: 'system',
             document.getElementById('autoConfirmOff').textContent = t('autoConfirmOff');
             document.getElementById('autoConfirmOnTime').textContent = t('autoConfirmOnTime');
             document.getElementById('autoConfirmEndOfDay').textContent = t('autoConfirmEndOfDay');
-        document.getElementById('calRowsLabel').textContent = t('calRowsLabel');
-        document.getElementById('calRowsHint').textContent = t('calRowsHint');
+        setIconLabel(document.getElementById('calRowsMinus'), t('calRowsLess'));
+        setIconLabel(document.getElementById('calRowsPlus'), t('calRowsMore'));
         document.getElementById('blockNavLabel').textContent = t('blockNavLabel');
         document.getElementById('blockNavHint').textContent = t('blockNavHint');
         document.getElementById('blockNavFloating').textContent = t('blockNavFloating');
@@ -3524,9 +3681,10 @@ theme: 'system',
         document.getElementById('blockNavOff').textContent = t('blockNavOff');
         document.querySelectorAll('.block-nav-bottom').forEach(b => { b.title = t('toBottom'); });
         document.querySelectorAll('.block-nav-top').forEach(b => { b.title = t('toTop'); });
-        document.getElementById('scrollBackLabel').textContent = t('scrollBack');
         setIconLabel(calDayClear, t('calReset'));
-            document.getElementById('calTasksToday').title = t('calToday');
+            const calTodayBtn = document.getElementById('calTasksToday');
+            calTodayBtn.title = t('calToday');
+            calTodayBtn.innerHTML = RETURN_SVG;
             refreshTasksCalendar();
             document.getElementById('syncTitleLabel').textContent = t('syncTitle');
             document.getElementById('syncLoginBtn').textContent = t('syncLogin');
@@ -3538,10 +3696,6 @@ theme: 'system',
             cloudUpdateStatus(false);
             const ndaysRepeatBtn = document.querySelector('#repeatRow .repeat-btn[data-key="ndays"]');
             if (ndaysRepeatBtn) ndaysRepeatBtn.title = t('repeatTitle');
-            document.querySelectorAll('.task-repeat-icon').forEach(ic => {
-                const host = ic.closest('li');
-                if (host) updateRepeatIcon(host);
-            });
             document.querySelectorAll('#tasksBlocks .collapse-toggle').forEach(btn => {
                 const hostLi = btn.closest('li');
                 setIconLabel(btn, hostLi && hostLi.classList.contains('task-collapsed') ? t('expandTask') : t('collapseTask'));
@@ -3577,6 +3731,8 @@ theme: 'system',
             document.getElementById('collapseHeightHint').textContent = t('collapseHeightHint');
             document.querySelector('label[for="settingRelativeTime"]').textContent = t('relativeTime');
             document.getElementById('relativeTimeHint').textContent = t('relativeTimeHint');
+            document.getElementById('searchWhileTypingLabel').textContent = t('searchWhileTypingLabel');
+            document.getElementById('searchWhileTypingHint').textContent = t('searchWhileTypingHint');
             document.getElementById('newTasksLabel').textContent = t('newTasks');
             updateNewTaskPositionBtn();
             document.getElementById('deadlineAlertLabel').textContent = t('deadlineAlertLabel');
@@ -3727,12 +3883,12 @@ theme: 'system',
             updateCollapseSettingUI();
             settingTheme.value = appSettings.theme || 'system';
             settingRelativeTime.checked = appSettings.useRelativeTime;
+            settingSearchWhileTyping.checked = !!appSettings.searchWhileTyping;
             settingNewTaskOnTop.checked = appSettings.newTaskOnTop;
             settingLanguage.value = appSettings.language || 'ru';
         settingDeadlineAlert.value = appSettings.deadlineAlertMinutes || 0;
             settingAutoConfirm.value = appSettings.autoConfirmReminders || 'off';
             settingBlockNav.value = appSettings.blockNavMode || 'floating';
-            settingCalRows.value = appSettings.calRows || 3;
             updateNewTaskPositionBtn();
             settingsModal.classList.add('active');
             // при открытии прокрутка всегда сверху
@@ -3742,6 +3898,13 @@ theme: 'system',
 
         function closeSettings() {
             settingsModal.classList.remove('active');
+            // сроки хранения чистят выполненные/корзину только когда пользователь
+            // закончил с настройками: случайный клик по селекту не удаляет данные
+            if (retentionNeedsCleanup) {
+                retentionNeedsCleanup = false;
+                checkAutoTrash();
+                checkTrashCleanup();
+            }
             focusTaskInput();
         }
 
@@ -3946,18 +4109,39 @@ theme: 'system',
                     addTask();
                 }
             }
+            // Esc очищает поле, фокус остаётся — можно набирать заново
+            if (e.key === 'Escape' && taskInput.value !== '') {
+                resetTaskInput();
+            }
         });
 
-        taskInput.addEventListener('input', function() {
+        // полный сброс поля новой задачи (крестик, Esc): текст, счётчик,
+        // кнопки, фильтр набора; фокус остаётся в поле
+        function resetTaskInput() {
+            taskInput.value = '';
+            inputLastText = '';
+            autoResizeTextarea();
+            updateAddButton();
+            updateDeadlineButtonState();
+            updateCharCounter(taskInput, document.getElementById('taskInputCounter'));
+            applyTypingSearch();
+        }
+
+        taskInput.addEventListener('input', function(e) {
             const maxLen = getMaxTaskLength();
-            if (this.value.length > inputLastText.length) {
-                if (this.value.length > maxLen) { this.value = inputLastText; }
+            // вставка из буфера разрешена всегда: превышение показывает счётчик
+            // и гасит кнопку «+» до сокращения текста; набор сверх лимита
+            // блокируется, как раньше
+            if (e.inputType !== 'insertFromPaste' &&
+                this.value.length > inputLastText.length && this.value.length > maxLen) {
+                this.value = inputLastText;
             }
             inputLastText = this.value;
             autoResizeTextarea();
             updateAddButton();
             updateDeadlineButtonState();
             updateCharCounter(this, document.getElementById('taskInputCounter'));
+            applyTypingSearch();
             if (this.value.trim() !== '') taskInput.classList.remove('error');
             if (!scrolledToTopOnInput && window.scrollY > 0) {
                 document.documentElement.scrollTop = 0;
@@ -3972,6 +4156,66 @@ theme: 'system',
             clearTaskInputSelection();
         });
 
+        // красный крестик в правом отступе поля: очистка одной кнопкой —
+        // тот же сброс, что и по Esc
+        taskInputClear.addEventListener('click', function() {
+            resetTaskInput();
+            taskInput.focus();
+        });
+
+        // фокус теряется не только там, где мы его возвращаем по клику
+        // (например, автопрокрутка средней кнопкой мыши). Первое печатаемое
+        // нажатие «в никуда» возвращает фокус в поле — символ попадает туда
+        // естественно, со всей кареткой и счётчиками; ручная вставка символа
+        // не используется (она ломала бы IME и дублировала браузерную).
+        // Пробел не перехватываем: на сфокусированной кнопке он должен нажимать
+        // кнопку, а после рефокуса буквой пробел и так попадает в поле
+        document.addEventListener('keydown', function(e) {
+            if (isTouchDevice || e.isComposing || e.keyCode === 229) return;
+            if (e.ctrlKey || e.altKey || e.metaKey) return;
+            if (e.key.length !== 1 || e.key === ' ') return;
+            if (document.body.classList.contains('modal-open')) return;
+            if (document.querySelector('.color-picker-blocker')) return;
+            const ae = document.activeElement;
+            if (ae && (ae.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(ae.tagName))) return;
+            // окно поиска открыто: печатаем в него — оно живёт в том же блоке
+            if (searchRow.style.display !== 'none') { searchInput.focus({ preventScroll: true }); return; }
+            focusTaskInput();
+        });
+
+        // Ctrl+V «в никуда» (фокус потерян) тоже должен работать: событие paste
+        // случается на документе, и текст вставляем вручную — preventDefault
+        // обязателен, иначе браузер вставит буфер в случайное место. Текст
+        // вставляется ЦЕЛИКОМ даже сверх лимита: превышение показывает счётчик
+        // и гасит кнопку «+» (inputType помечает вставку — обработчик input
+        // не блокирует её)
+        document.addEventListener('paste', function(e) {
+            if (isTouchDevice) return;
+            if (document.body.classList.contains('modal-open')) return;
+            if (document.querySelector('.color-picker-blocker')) return;
+            const ae = document.activeElement;
+            if (ae && (ae.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(ae.tagName))) return;
+            const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+            if (!text) return;
+            e.preventDefault();
+            if (searchRow.style.display !== 'none') {
+                const st = searchInput.selectionStart !== null ? searchInput.selectionStart : searchInput.value.length;
+                const en = searchInput.selectionEnd !== null ? searchInput.selectionEnd : st;
+                searchInput.value = searchInput.value.slice(0, st) + text + searchInput.value.slice(en);
+                searchInput.selectionStart = searchInput.selectionEnd = st + text.length;
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                searchInput.focus({ preventScroll: true });
+                return;
+            }
+            const st = taskInput.selectionStart !== null ? taskInput.selectionStart : taskInput.value.length;
+            const en = taskInput.selectionEnd !== null ? taskInput.selectionEnd : st;
+            taskInput.value = taskInput.value.slice(0, st) + text + taskInput.value.slice(en);
+            taskInput.selectionStart = taskInput.selectionEnd = st + text.length;
+            taskInput.classList.remove('error');
+            taskInput.focus({ preventScroll: true });
+            taskInput.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' }));
+        });
+
         window.addEventListener('wheel', function() { scrolledToTopOnInput = false; });
 
         function autoResizeTextarea() {
@@ -3982,7 +4226,8 @@ theme: 'system',
         }
 
         function updateAddButton() {
-            if (taskInput.value.trim() === '') addBtn.classList.add('inactive');
+            inputWrapper.classList.toggle('has-text', taskInput.value !== '');
+            if (taskInput.value.trim() === '' || taskInput.value.length > getMaxTaskLength()) addBtn.classList.add('inactive');
             else addBtn.classList.remove('inactive');
         }
 
@@ -4075,16 +4320,26 @@ theme: 'system',
             if (this.files && this.files[0]) { importData(this.files[0]); this.value = ''; }
         });
 
+        // новое значение срока хранения просто запоминается; чистка данных —
+        // один раз при закрытии окна (см. closeSettings)
+        let retentionNeedsCleanup = false;
+
         settingCompletedDays.addEventListener('change', function() {
             appSettings.completedRetentionDays = parseInt(this.value);
             saveSettings();
-            checkAutoTrash();
+            retentionNeedsCleanup = true;
         });
 
         settingTrashDays.addEventListener('change', function() {
             appSettings.trashRetentionDays = parseInt(this.value);
             saveSettings();
-            checkTrashCleanup();
+            retentionNeedsCleanup = true;
+        });
+
+        settingSearchWhileTyping.addEventListener('change', function() {
+            appSettings.searchWhileTyping = this.checked;
+            saveSettings();
+            applyTypingSearch();
         });
 
         settingMaxTaskLength.addEventListener('focus', function() {
@@ -4222,20 +4477,35 @@ theme: 'system',
             saveSettings();
             // сменили режим — применяем раскладку полосок сразу
             applyBlockNavMode();
+            // и переносим «воздух» под нижнюю полоску (режим «между блоками»)
+            updateTailSpace();
         });
 
-        // число строк календаря: только кнопки −/+, поле — только чтение
+        // число строк календаря: кнопки −/+ в шапке календаря активных задач
         const calRowsStep = (delta) => {
             const v = Math.min(8, Math.max(1, (appSettings.calRows || 3) + delta));
-            settingCalRows.value = v;
             if (appSettings.calRows !== v) {
                 appSettings.calRows = v;
                 saveSettings();
                 refreshTasksCalendar();
             }
+            updateCalRowsButtons();
         };
-        document.getElementById('calRowsMinus').addEventListener('click', () => calRowsStep(-1));
-        document.getElementById('calRowsPlus').addEventListener('click', () => calRowsStep(1));
+        // на границах диапазона (1..8) кнопка гаснет, как стрелка листания
+        function updateCalRowsButtons() {
+            const v = appSettings.calRows || 3;
+            document.getElementById('calRowsMinus').disabled = v <= 1;
+            document.getElementById('calRowsPlus').disabled = v >= 8;
+        }
+        updateCalRowsButtons();
+        document.getElementById('calRowsMinus').addEventListener('click', e => {
+            if (isTouchDevice) e.currentTarget.blur();
+            calRowsStep(-1);
+        });
+        document.getElementById('calRowsPlus').addEventListener('click', e => {
+            if (isTouchDevice) e.currentTarget.blur();
+            calRowsStep(1);
+        });
 
         // ====================================================================
         //  Клавиатура: Esc/Enter/Delete с учётом открытых окон
@@ -4540,7 +4810,7 @@ theme: 'system',
             if (taskInfoPopup && !taskInfoPopup.contains(e.target) && !e.target.closest('.task-completed-info')) {
                 // повторный клик по тому же времени не гасим здесь —
                 // его обработает тоггл в обработчике списка
-                if (taskInfoPopup._anchor && taskInfoPopup._anchor === e.target.closest('.task-completed-info, .trash-date, .task-date')) return;
+                if (taskInfoPopup._anchor && taskInfoPopup._anchor === e.target.closest('.task-completed-info, .trash-date, .task-date, .deadline-display')) return;
                 closeTaskInfoPopup();
                 // клик по «пустому месту» с открытой карточкой закрывает только её:
                 // гасим дальнейшую обработку, чтобы не закрылось само модальное окно
@@ -4561,8 +4831,9 @@ theme: 'system',
             document.removeEventListener('keydown', onEscCloseInfo, true);
             window.removeEventListener('scroll', closeTaskInfoPopup, true);
         }
-        // общий механизм всплывающей карточки: rows — пары [подпись, значение]
-        function showInfoPopup(anchor, rows) {
+        // общий механизм всплывающей карточки: rows — пары [подпись, значение],
+        // buttons — необязательные действия [{ label, primary?, action }]
+        function showInfoPopup(anchor, rows, buttons) {
             closeTaskInfoPopup();
             const popup = document.createElement('div');
             popup.className = 'info-popup';
@@ -4579,6 +4850,19 @@ theme: 'system',
                 row.appendChild(v);
                 popup.appendChild(row);
             });
+            if (buttons && buttons.length) {
+                const actions = document.createElement('div');
+                actions.className = 'info-popup-actions';
+                buttons.forEach(b => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'info-popup-btn' + (b.primary ? ' primary' : '');
+                    btn.textContent = b.label;
+                    btn.addEventListener('click', e => { e.stopPropagation(); b.action(); });
+                    actions.appendChild(btn);
+                });
+                popup.appendChild(actions);
+            }
             document.body.appendChild(popup);
             const r = anchor.getBoundingClientRect();
             const pw = popup.offsetWidth;
@@ -4697,6 +4981,8 @@ theme: 'system',
                 (map[k] = map[k] || []).push({ color: color, repeat: repeat });
             };
             document.querySelectorAll('#tasksBlocks li:not(.clone-task)').forEach(li => {
+                // активный поиск фильтрует и точки: скрытые карточки не рисуем
+                if (li.classList.contains('search-hidden')) return;
                 const chip = li.querySelector('.deadline-display');
                 if (!chip || !chip.dataset.deadline) return;
                 const color = li.getAttribute('data-color') || 'none';
@@ -4756,33 +5042,41 @@ theme: 'system',
                 }
             }
             if (calWeekOffset < minOffset) calWeekOffset = minOffset;
+            // «назад» неактивна (серая), когда глубже в прошлое листать некуда
+            document.getElementById('calTasksPrev').disabled = calWeekOffset <= minOffset;
             start.setDate(start.getDate() - dow - weeksBack * 7 + calWeekOffset * 7);
             calWindowStart = new Date(start);
             const end = new Date(start); end.setDate(end.getDate() + rows * 7 - 1); end.setHours(23, 59, 59, 999);
             const fmt = { day: 'numeric', month: 'short' };
             document.getElementById('calTasksTitle').textContent =
                 start.toLocaleDateString(locale, fmt) + ' – ' + end.toLocaleDateString(locale, fmt);
-            const wd = [];
-            const monday = new Date(2024, 0, 1);
-            for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(monday.getDate() + i); wd.push(d.toLocaleDateString(locale, { weekday: 'narrow' })); }
-            document.getElementById('calTasksWeekdays').innerHTML = wd.map(x => '<div class="cal-weekday">' + x + '</div>').join('');
+            // кнопка «к текущей неделе» видна, только если текущей недели нет в окне
+            // (место резервируется через visibility, чтобы стрелки не прыгали)
+            const weekSunday = new Date(weekStart); weekSunday.setDate(weekSunday.getDate() + 6);
+            document.getElementById('calTasksToday').style.visibility =
+                (start.getTime() <= weekStart.getTime() && end.getTime() >= weekSunday.getTime()) ? 'hidden' : 'visible';
+            // подписи дней недели: сокращения из словаря (Пон Вт Ср…), неделя с понедельника
+            document.getElementById('calTasksWeekdays').innerHTML =
+                t('weekdaysShort').map(x => '<div class="cal-weekday">' + x + '</div>').join('');
 
             const items = collectCalendarItems(start, end);
             const grid = document.getElementById('calTasksDays');
             grid.innerHTML = '';
-            // строка «Задачи на дд.мм · N / M» — видна при выбранном дне
+            // строка «Задачи на дд.мм · N / M» при выбранном дне;
+            // без выбора — общее число задач с дедлайном; видна всегда
             const statusRow = document.getElementById('calStatusRow');
+            const real = [...deadlineList.children, ...taskList.children]
+                .filter(li => !li.classList.contains('clone-task'));
             if (calendarDayFilter && calendarDayFilter.type === 'day') {
                 const d = new Date(calendarDayFilter.y, calendarDayFilter.m, calendarDayFilter.d);
                 const label = d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' });
-                const real = [...deadlineList.children, ...taskList.children]
-                    .filter(li => !li.classList.contains('clone-task'));
                 const n = real.filter(li => calendarMatches(li, calendarDayFilter)).length;
                 statusRow.textContent = t('tasksOnDay') + ' ' + label + ' · ' + n + ' / ' + real.length;
-                statusRow.style.display = 'block';
             } else {
-                statusRow.style.display = 'none';
+                const withDl = [...deadlineList.children].filter(li => !li.classList.contains('clone-task')).length;
+                statusRow.textContent = t('tasksWithDeadline') + ' · ' + withDl;
             }
+            statusRow.style.display = 'block';
             for (let i = 0; i < rows * 7; i++) {
                 const cellDate = new Date(start); cellDate.setDate(cellDate.getDate() + i);
                 const cell = document.createElement('div');
@@ -4854,11 +5148,22 @@ theme: 'system',
         }
 
         // после изменения дедлайна: убрать карточку из выбранного дня,
-        // обновить точки и мигнуть днём, куда встала точка напоминания
-        function calendarAfterDeadlineChange(newDs, allowBlink) {
+        // обновить точки; точка задачи «перебегает» из старого дня в новый
+        function calendarAfterDeadlineChange(newDs, allowBlink, oldDs, color) {
             if (calendarDayFilter) applySearch();
+            // призрак точки ставится ДО перерисовки — разрыва нет
+            let flight = prepareDotFlight(oldDs, newDs, color);
             refreshTasksCalendar();
-            if (!newDs || !calendarDayFilter) return;
+            if (flight) {
+                if (flight.kind === 'none') { flight.ghost.remove(); flight = null; }
+                else if (flight.kind === 'vanish') { playDotVanish(flight); flight = null; }
+            }
+            if (!newDs || !calendarDayFilter) {
+                // без выбранного дня окно не сдвигаем (как и раньше):
+                // точка летит, только если новый день в текущем окне
+                startDotFlight(flight, newDs);
+                return;
+            }
             const nd = new Date(newDs); nd.setHours(0, 0, 0, 0);
             const rows = Math.min(8, Math.max(1, appSettings.calRows || 3));
             if (!calWindowStart) return;
@@ -4867,8 +5172,7 @@ theme: 'system',
             // если новая дата вне окна — сдвинуть окно, чтобы день был виден
             if (nd < wS) { calWeekOffset -= Math.ceil((wS - nd) / (7 * 86400000)); renderTasksCalendar(); }
             else if (nd > wE) { calWeekOffset += Math.ceil((nd - wE) / (7 * 86400000)); renderTasksCalendar(); }
-            const cell = Array.from(document.querySelectorAll('#calTasksDays .cal-cell')).find(c =>
-                +c.dataset.y === nd.getFullYear() && +c.dataset.m === nd.getMonth() && +c.dataset.d === nd.getDate());
+            const cell = findCalendarCell(nd);
             if (cell) {
                 cell.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 if (allowBlink !== false) {
@@ -4876,6 +5180,126 @@ theme: 'system',
                     setTimeout(() => cell.classList.remove('cal-blink'), 1600);
                 }
             }
+            startDotFlight(flight, newDs);
+        }
+
+        function findCalendarCell(d) {
+            return Array.from(document.querySelectorAll('#calTasksDays .cal-cell')).find(c =>
+                +c.dataset.y === d.getFullYear() && +c.dataset.m === d.getMonth() && +c.dataset.d === d.getDate());
+        }
+
+        // точка своего цвета в ячейке (у повторяющихся — «пончик» по borderColor);
+        // без совпадения — последняя
+        function pickCellDot(cell, color) {
+            const dots = cell.querySelectorAll('.cal-dot');
+            if (!dots.length) return null;
+            const bg = 'var(--task-color-' + (color || 'none') + ')';
+            for (const d of dots) {
+                if (d.style.background === bg || d.style.borderColor === bg) return d;
+            }
+            return dots[dots.length - 1];
+        }
+
+        // призрак точки в старой позиции. Вызывается ПОСЛЕ sortTasks, который
+        // уже перерисовал календарь: старая точка стёрта, поэтому позицию
+        // берём по соседней точке ячейки или синтезируем (низ ячейки по центру),
+        // а вид строим из цвета задачи
+        function prepareDotFlight(oldDs, newDs, color) {
+            if (!oldDs) return null;
+            const od = new Date(oldDs);
+            if (isNaN(od.getTime())) return null;
+            const oldCell = findCalendarCell(od);
+            if (!oldCell || !oldCell.getBoundingClientRect().width) return null;
+            const dotEl = pickCellDot(oldCell, color);
+            let ghost, rect;
+            if (dotEl) {
+                ghost = dotEl.cloneNode(true);
+                rect = dotEl.getBoundingClientRect();
+            } else {
+                ghost = makeDotGhost(color);
+                rect = synthesizedDotRect(oldCell);
+            }
+            const ghostStyle = getComputedStyle(ghost);
+            if (ghostStyle.display === 'none' || ghostStyle.visibility === 'hidden') return null;
+            ghost.style.position = 'fixed';
+            ghost.style.left = rect.left + 'px';
+            ghost.style.top = rect.top + 'px';
+            ghost.style.margin = '0';
+            ghost.style.zIndex = '3000';
+            ghost.style.pointerEvents = 'none';
+            document.body.appendChild(ghost);
+            const nd = newDs ? new Date(newDs) : null;
+            let kind;
+            if (!nd || isNaN(nd.getTime())) kind = 'vanish'; // дедлайн снят — точка тает
+            else if (od.getFullYear() === nd.getFullYear() && od.getMonth() === nd.getMonth() && od.getDate() === nd.getDate()) kind = 'none'; // тот же день — лететь некуда
+            else kind = 'fly';
+            // длительность полёта от расстояния: соседние дни — ~2с,
+            // противоположные концы окна (20+ дней) — 3с
+            const dayDiff = kind === 'fly' ? Math.min(20, Math.abs(Math.round((nd - od) / 86400000))) : 0;
+            const dur = kind === 'fly' ? 2000 + dayDiff / 20 * 1000 : 650;
+            return { ghost, from: rect, kind, color: color || 'none', dur };
+        }
+
+        function makeDotGhost(color) {
+            const g = document.createElement('span');
+            g.className = 'cal-dot';
+            g.style.background = 'var(--task-color-' + (color || 'none') + ')';
+            return g;
+        }
+
+        // где в ячейке без точек стояла бы точка: прижатая к низу, по центру
+        function synthesizedDotRect(cell) {
+            const r = cell.getBoundingClientRect();
+            return { left: r.left + r.width / 2 - 4, top: r.bottom - 14, width: 8, height: 8 };
+        }
+
+        function startDotFlight(flight, newDs) {
+            if (!flight) return;
+            let target = null;
+            if (newDs) {
+                const cell = findCalendarCell(new Date(newDs));
+                if (cell) target = pickCellDot(cell, flight.color);
+            }
+            if (!target) { flight.ghost.remove(); return; }
+            playDotFly(flight, target);
+        }
+
+        // перелёт: длительность от расстояния (2с у соседних дней, до 3с
+        // у противоположных концов окна); rAF каждый кадр читает актуальную
+        // позицию цели, поэтому анимация переживает прокрутку страницы
+        function playDotFly(flight, targetDot) {
+            const ghost = flight.ghost;
+            const startX = flight.from.left, startY = flight.from.top;
+            const dur = flight.dur || 2000;
+            const t0 = performance.now();
+            targetDot.style.visibility = 'hidden';
+            const finish = () => {
+                if (document.contains(targetDot)) targetDot.style.visibility = '';
+                if (document.contains(ghost)) ghost.remove();
+            };
+            function frame(now) {
+                const p = Math.min(1, (now - t0) / dur);
+                const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+                if (document.contains(targetDot)) {
+                    const tr = targetDot.getBoundingClientRect();
+                    ghost.style.transform = 'translate(' + Math.round((tr.left - startX) * e) + 'px,' + Math.round((tr.top - startY) * e) + 'px)';
+                }
+                if (p < 1) requestAnimationFrame(frame);
+                else finish();
+            }
+            requestAnimationFrame(frame);
+            setTimeout(finish, dur + 500); // страховка: скрытая вкладка не гоняет rAF
+        }
+
+        // дедлайн снят: точка тает на старом месте
+        function playDotVanish(flight) {
+            const ghost = flight.ghost;
+            ghost.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            requestAnimationFrame(() => {
+                ghost.style.opacity = '0';
+                ghost.style.transform = 'scale(0.4)';
+            });
+            setTimeout(() => { if (document.contains(ghost)) ghost.remove(); }, 650);
         }
 
         function setCalendarFilter(f) {
@@ -4885,7 +5309,7 @@ theme: 'system',
             calendarDayFilter = f;
             // подсветка выбранного дня и крестик сброса
             renderTasksCalendar();
-            calDayClear.style.display = f ? '' : 'none';
+            calDayClear.style.visibility = f ? 'visible' : 'hidden';
             // поиск и фильтр дня работают вместе — поиск не закрываем;
             // applySearch фильтрует карточки дедлайна и синхронизирует блоки
             applySearch();
@@ -4903,18 +5327,52 @@ theme: 'system',
         }
 
         function initTasksCalendar() {
-            document.getElementById('calTasksPrev').addEventListener('click', () => {
+            document.getElementById('calTasksPrev').addEventListener('click', e => {
+                if (isTouchDevice) e.currentTarget.blur(); // не залипает нажатой
                 calWeekOffset -= 1;
                 renderTasksCalendar();
             });
-            document.getElementById('calTasksNext').addEventListener('click', () => {
+            // связка «выбранный день ↔ крестик сброса»: наведение на день
+            // перечёркивает его диагональю и подсвечивает крестик, и наоборот
+            if (!isTouchDevice) {
+                const daysGrid = document.getElementById('calTasksDays');
+                const linkedCell = () => daysGrid.querySelector('.cal-cell.selected');
+                daysGrid.addEventListener('mouseover', function(e) {
+                    const sel = linkedCell();
+                    if (!sel) return;
+                    const on = !!e.target.closest('.cal-cell.selected');
+                    sel.classList.toggle('reset-hover', on);
+                    calDayClear.classList.toggle('reset-hover', on);
+                });
+                daysGrid.addEventListener('mouseleave', function() {
+                    const sel = linkedCell();
+                    if (sel) sel.classList.remove('reset-hover');
+                    calDayClear.classList.remove('reset-hover');
+                });
+                calDayClear.addEventListener('mouseenter', function() {
+                    const sel = linkedCell();
+                    if (sel) sel.classList.add('reset-hover');
+                });
+                calDayClear.addEventListener('mouseleave', function() {
+                    const sel = linkedCell();
+                    if (sel) sel.classList.remove('reset-hover');
+                });
+            }
+            document.getElementById('calTasksNext').addEventListener('click', e => {
+                if (isTouchDevice) e.currentTarget.blur();
                 calWeekOffset += 1;
                 renderTasksCalendar();
             });
-            document.getElementById('calTasksToday').addEventListener('click', () => {
+            document.getElementById('calTasksNext').addEventListener('click', e => {
+                if (isTouchDevice) e.currentTarget.blur();
+                calWeekOffset += 1;
+                renderTasksCalendar();
+            });
+            document.getElementById('calTasksToday').addEventListener('click', e => {
+                if (isTouchDevice) e.currentTarget.blur();
+                // только возврат окна к текущей неделе; выбранный день не трогаем —
+                // у сброса дня свои пути (крестик и строка статуса)
                 calWeekOffset = 0;
-                // «вернуться к сегодня» — сбрасывает и выбранный день
-                setCalendarFilter(null);
                 renderTasksCalendar();
             });
             calDayClear.addEventListener('click', () => setCalendarFilter(null));
@@ -4999,10 +5457,20 @@ theme: 'system',
                     return;
                 }
                 if (e.target.closest('.deadline-display')) {
-                    currentEditingTask = resolveTaskLi(li);
+                    const resolved = resolveTaskLi(li);
+                    const chip = e.target.closest('.deadline-display');
+                    const rule = resolved.dataset.repeat ? parseRepeatRule(resolved.dataset.repeat) : null;
+                    // у повторяющейся со словом «Наступило» клик — карточка-подсказка
+                    // вместо окна изменения времени (повторный клик закрывает)
+                    if (rule && resolved.classList.contains('reminder-due')) {
+                        if (taskInfoPopup && taskInfoPopup._anchor === chip) { closeTaskInfoPopup(); return; }
+                        showReminderDuePopup(chip, resolved);
+                        return;
+                    }
+                    currentEditingTask = resolved;
                     // у напоминания это не дедлайн — «Изменить время»
-                    modalTitle.textContent = currentEditingTask.dataset.repeat ? t('changeTimeTitle') : t('changeDeadlineTitle');
-                    openDeadlineModal(currentEditingTask, e.target.closest('.deadline-display').dataset.deadline);
+                    modalTitle.textContent = rule ? t('changeTimeTitle') : t('changeDeadlineTitle');
+                    openDeadlineModal(currentEditingTask, chip.dataset.deadline);
                     return;
                 }
             });
@@ -5020,6 +5488,16 @@ theme: 'system',
                 if (taskList.classList.contains('search-active')) { e.preventDefault(); return; }
                 if (li.querySelector('.task-color-picker')) { e.preventDefault(); return; }
                 draggedElement = li;
+
+                // на таче Android/WebView игнорирует setDragImage: поверх нашего
+                // призрака рисуется системная картинка перетаскивания, задача
+                // «двоится». Оставляем системную, оригинал гасим классом .dragging
+                if (isTouchDevice) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', '');
+                    li.classList.add('dragging');
+                    return;
+                }
 
                 const rect = li.getBoundingClientRect();
                 dragGhostOffsetX = e.clientX - rect.left;
@@ -5055,7 +5533,7 @@ theme: 'system',
 
             function findTargetTask(clientY) {
                 const allLi = Array.from(taskList.children);
-                const candidates = allLi.filter(li => !li.classList.contains('sorted-task') && !li.classList.contains('pinned') && !li.classList.contains('search-hidden') && li !== draggedElement);
+                const candidates = allLi.filter(li => !li.classList.contains('sorted-task') && !li.classList.contains('search-hidden') && li !== draggedElement);
                 if (candidates.length === 0) return null;
                 const panelRect = taskList.parentElement.getBoundingClientRect();
                 if (clientY > panelRect.bottom) return null;
@@ -5090,7 +5568,9 @@ theme: 'system',
                     if (position === 'bottom') {
                         let next = targetLi.nextElementSibling;
                         if (next === draggedElement) next = next.nextElementSibling;
-                        if (next && !next.classList.contains('sorted-task') && !next.classList.contains('pinned')) {
+                        // закреплённая следующая — обычный якорь броска:
+                        // вставка перед ней = сразу под целевой карточкой
+                        if (next && !next.classList.contains('sorted-task')) {
                             next.classList.add('drag-over-top');
                             currentDropTarget = next;
                         } else {
@@ -5135,7 +5615,10 @@ theme: 'system',
                 if (!draggedElement) return;
                 const elementUnderCursor = document.elementFromPoint(e.clientX, e.clientY);
                 const blockedLi = elementUnderCursor ? elementUnderCursor.closest('li') : null;
-                if (blockedLi && (blockedLi.classList.contains('sorted-task') || blockedLi.classList.contains('pinned') || blockedLi.classList.contains('completed'))) {
+                // сама перетаскиваемая карточка не блокирует; закреплённые карточки
+                // теперь обычные участники списка «без дедлайна» — их можно
+                // обкатывать при переносе и принимать бросок
+                if (blockedLi && blockedLi !== draggedElement && (blockedLi.classList.contains('sorted-task') || blockedLi.classList.contains('completed'))) {
                     e.dataTransfer.dropEffect = 'none';
                     setBlockedHighlight(true);
                     updateDropIndicator(null, null);
@@ -5523,22 +6006,23 @@ theme: 'system',
                 calDays.style.display = '';
                 calMonths.style.display = 'none';
                 calMonthYear.textContent = calendarViewDate.toLocaleDateString(locale, { month: 'long' }) + ' ' + year;
-                const weekdays = [];
-                const monday = new Date(2024, 0, 1);
-                for (let i = 0; i < 7; i++) { const d = new Date(monday); d.setDate(monday.getDate() + i); weekdays.push(d.toLocaleDateString(locale, { weekday: 'narrow' })); }
-                calWeekdays.innerHTML = weekdays.map(d => `<div class="calendar-weekday">${d}</div>`).join('');
+                // подписи дней недели: те же сокращения из словаря, что и в
+                // календаре активных задач (Пн Вт Ср…), неделя с понедельника
+                calWeekdays.innerHTML = t('weekdaysShort').map(d => `<div class="calendar-weekday">${d}</div>`).join('');
                 const firstDay = new Date(year, month, 1);
                 let startOffset = firstDay.getDay() - 1; if (startOffset < 0) startOffset = 6;
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 const daysInPrevMonth = new Date(year, month, 0).getDate();
                 let cells = '';
                 for (let i = 0; i < 42; i++) {
-                    let day, cellDate, isOther = false;
+                    let day, cellDate, isOther = false, isNext = false;
                     if (i < startOffset) { day = daysInPrevMonth - startOffset + i + 1; cellDate = new Date(year, month - 1, day); isOther = true; }
-                    else if (i >= startOffset + daysInMonth) { day = i - startOffset - daysInMonth + 1; cellDate = new Date(year, month + 1, day); isOther = true; }
+                    else if (i >= startOffset + daysInMonth) { day = i - startOffset - daysInMonth + 1; cellDate = new Date(year, month + 1, day); isOther = true; isNext = true; }
                     else { day = i - startOffset + 1; cellDate = new Date(year, month, day); }
                     const classes = ['calendar-day'];
                     if (isOther) classes.push('other-month');
+                    // дни следующего месяца чуть темнее дней предыдущего
+                    if (isNext) classes.push('next-month');
                     if (cellDate.getTime() === today.getTime()) classes.push('today');
                     if (intendedDay === null && cellDate.getFullYear() === modalDateTime.getFullYear() && cellDate.getMonth() === modalDateTime.getMonth() && cellDate.getDate() === modalDateTime.getDate()) classes.push('selected');
                     if (cellDate < minDate || cellDate > maxDate) classes.push('disabled');
@@ -5775,8 +6259,18 @@ theme: 'system',
             updatePickerDisplay();
         }
 
+        // подсветка честна к подписи: если «откат на завтра» сдвинул пресет
+        // за пределы его номинального дня (например, «сегодня 23:59» в 23:59:xx
+        // вычисляется как завтра 23:59 и совпадает с пресетом «завтра 23:59»),
+        // такой пресет не подсвечиваем — иначе горят оба сразу
         function matchesPreset(p) {
-            return Math.floor(computePresetDate(p).getTime() / 60000) === Math.floor(modalDateTime.getTime() / 60000);
+            const computed = computePresetDate(p);
+            const nominal = new Date();
+            nominal.setDate(nominal.getDate() + (p.days || 0));
+            if (computed.getFullYear() !== nominal.getFullYear() ||
+                computed.getMonth() !== nominal.getMonth() ||
+                computed.getDate() !== nominal.getDate()) return false;
+            return Math.floor(computed.getTime() / 60000) === Math.floor(modalDateTime.getTime() / 60000);
         }
 
         // подсветить пресет, совпадающий с текущим временем пикера (с точностью до минуты)
@@ -6062,11 +6556,11 @@ theme: 'system',
         }
 
         function formatShortDateTime(d) {
-            return d.toLocaleString(localeStr(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            return d.toLocaleString(localeStr(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
         }
 
         function formatFullDate(d) {
-            return d.toLocaleString(localeStr(), { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            return d.toLocaleString(localeStr(), { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
         }
 
         function formatRelativeTime(d) {
@@ -6108,6 +6602,8 @@ theme: 'system',
         function addTask() {
             const txt = taskInput.value.trim();
             if (txt === '') { taskInput.classList.add('error'); taskInput.focus(); return; }
+            // вставленный сверх лимита текст нельзя добавить, пока не сокращён
+            if (taskInput.value.length > getMaxTaskLength()) { taskInput.classList.add('error'); taskInput.focus(); return; }
             taskInput.classList.remove('error');
         if (pendingDeadline && new Date(pendingDeadline) <= new Date()) {
             pendingDeadline = null;
@@ -6140,6 +6636,7 @@ theme: 'system',
             updateAddButton();
             updateDeadlineButtonState();
             updateCharCounter(taskInput, document.getElementById('taskInputCounter'));
+            applyTypingSearch();
             pendingDeadline = null;
             pendingRepeat = null;
             updatePendingDeadlineButton();
@@ -6296,7 +6793,6 @@ theme: 'system',
             if (task.completed && task.completedAt) {
                 addCompletedInfo(li, task.completedAt, task.createdAt, task.restoredAt || null, task.deadline || null);
             }
-            updateRepeatIcon(li);
             renderReminderStats(li);
             refreshToggleButton(li);
             return li;
@@ -6455,6 +6951,39 @@ theme: 'system',
             showInfoPopup(anchor, rows);
         }
 
+        // карточка-подсказка у повторяющейся задачи со словом «Наступило»:
+        // серия, наступивший слот, пропуски, подтверждения — и действия.
+        // Открывается по клику на плашку вместо окна изменения времени
+        function showReminderDuePopup(anchor, li) {
+            const chip = li.querySelector('.deadline-display');
+            const rule = parseRepeatRule(li.dataset.repeat);
+            const rows = [];
+            if (rule) rows.push([t('repeatTitle'), repeatRuleText(rule)]);
+            if (chip && chip.dataset.deadline) rows.push([t('slotDue'), formatFullDate(new Date(chip.dataset.deadline))]);
+            const count = parseInt(li.dataset.reminderCount, 10) || 0;
+            if (count > 0) rows.push([t('reminderCountLabel'), count + ' ' + formatUnitCount(count, 'time')]);
+            if (rule && chip && chip.dataset.deadline) {
+                const missed = countMissedSlots(new Date(chip.dataset.deadline), rule);
+                if (missed > 0) rows.push([t('missedLabel'), String(missed)]);
+            }
+            showInfoPopup(anchor, rows, [
+                {
+                    label: t('reminderConfirm'),
+                    primary: true,
+                    action: () => { closeTaskInfoPopup(); handleReminderOk(li); }
+                },
+                {
+                    label: t('changeTimeTitle'),
+                    action: () => {
+                        closeTaskInfoPopup();
+                        currentEditingTask = li;
+                        modalTitle.textContent = t('changeTimeTitle');
+                        openDeadlineModal(li, chip ? chip.dataset.deadline : null);
+                    }
+                }
+            ]);
+        }
+
         // наступил ли день дедлайна напоминания (сегодня или раньше)
         function reminderDueToday(li) {
             const chip = li.querySelector('.deadline-display');
@@ -6532,86 +7061,16 @@ theme: 'system',
             }
         }
 
-        // ====================================================================
-        //  Кнопка «Вернуться»: запоминает место прокрутки перед прыжком
-        //  списка (закрепление, дедлайн) и предлагает вернуться
-        // ====================================================================
-        const scrollBackBtn = document.getElementById('scrollBackBtn');
-        let scrollBackY = null;        // запомненное положение прокрутки
-        let scrollBackShownAt = 0;     // момент показа: отсекаем хвост чужой анимации
-        let scrollBackAnimating = false;
-        let scrollBackToken = 0;       // более новое действие отменяет запланированный показ
-        let scrollBackActionUntil = 0; // действие само прокручивает список до этого момента
-        let scrollBackMouseY = null;   // где курсор на компьютере
-
-        if (!isTouchDevice) {
-            document.addEventListener('mousemove', e => { scrollBackMouseY = e.clientY; }, { passive: true });
-        }
-
-        // стрелка на кнопке: куда поедет возврат — вверх или вниз
-        function updateScrollBackArrow() {
-            const up = scrollBackY !== null && scrollBackY < window.scrollY;
-            scrollBackBtn.innerHTML = (up ? ARROW_UP_SVG : ARROW_DOWN_SVG) +
-                '<span id="scrollBackLabel">' + t('scrollBack') + '</span>';
-        }
-
-        function offerScrollBack(beforeY) {
-            const tk = ++scrollBackToken;
-            // действие докручивает список само (scrollIntoView через 100мс и
-            // плавная анимация ~0.7с) — решаем, показывать ли кнопку, после того
-            // как станет ясно, уехал ли список
-            scrollBackActionUntil = Date.now() + 1100;
-            setTimeout(() => {
-                if (tk !== scrollBackToken) return;
-                if (Math.abs(window.scrollY - beforeY) < 80) return;
-                scrollBackY = beforeY;
-                scrollBackShownAt = Date.now();
-                scrollBackAnimating = false;
-                // на компьютере кнопка встаёт по вертикали туда, где была мышь
-                if (!isTouchDevice && scrollBackMouseY !== null) {
-                    scrollBackBtn.style.top = Math.min(Math.max(scrollBackMouseY - 17, 8), window.innerHeight - 46) + 'px';
-                    scrollBackBtn.style.bottom = 'auto';
-                } else {
-                    scrollBackBtn.style.top = 'auto';
-                    scrollBackBtn.style.bottom = '22px';
-                }
-                updateScrollBackArrow();
-                scrollBackBtn.classList.add('show');
-            }, 950);
-        }
-
-        function hideScrollBack() {
-            scrollBackToken++;
-            scrollBackY = null;
-            scrollBackBtn.classList.remove('show');
-        }
-
-        scrollBackBtn.addEventListener('click', () => {
-            const y = scrollBackY;
-            hideScrollBack();
-            if (y === null) return;
-            scrollBackAnimating = true;
-            window.scrollTo({ top: y, behavior: 'smooth' });
-            focusTaskInput();
-            setTimeout(() => { scrollBackAnimating = false; }, 1200);
-        });
-
-        // ручная прокрутка (колесо, свайп, инерция) прячет кнопку; события скролла
-        // от анимации самого действия (например, второе закрепление при горящей
-        // кнопке) игнорируются — иначе они прячут кнопку и отменяют новый показ
-        window.addEventListener('scroll', () => {
-            if (!scrollBackBtn.classList.contains('show') || scrollBackAnimating) return;
-            const now = Date.now();
-            if (now < scrollBackActionUntil) return;
-            if (now - scrollBackShownAt < 1200) return;
-            hideScrollBack();
-        }, { passive: true });
-
         function togglePin(li) {
             li = resolveTaskLi(li);
             if (li.classList.contains('completed')) return;
-            const scrollBackFrom = window.scrollY;
             const willPin = !li.classList.contains('pinned');
+            // якорь: карточку, по которой кликнули, держим на месте экрана —
+            // рост/усадка блока закреплённых и полоски чипов вверху иначе
+            // сдвигают список под пальцем (якорь снимается в конце потока,
+            // когда все перерисовки уже произошли; браузерная scroll-anchoring
+            // для документа выключена, иначе она спорит с компенсацией)
+            const anchorViewportTop = li.getBoundingClientRect().top;
             const pinBtn = li.querySelector('.pin-btn');
             if (willPin) {
                 // оригинал остаётся на своём месте; копия появится
@@ -6624,19 +7083,24 @@ theme: 'system',
                 if (pinBtn) setIconLabel(pinBtn, t('pin'));
             }
             updateTaskHandle(li, false, !!li.querySelector('.deadline-display'));
-            // подсветка как у новой задачи; перезапуск анимации при быстром повторном нажатии
+            // оригинал никуда не перемещается — подсветка фоном
+            // без анимации переноса (slideIn выглядит как скачок)
             if (li._appearingTimer) clearTimeout(li._appearingTimer);
-            li.classList.remove('appearing');
+            li.classList.remove('appearing', 'just-pinned');
             void li.offsetWidth;
-            li.classList.add('appearing');
-            li._appearingTimer = setTimeout(() => li.classList.remove('appearing'), 1500);
+            li.classList.add('just-pinned');
+            li._appearingTimer = setTimeout(() => li.classList.remove('just-pinned'), 1500);
             sortTasks();
             saveTasks();
             updateCollapseState();
+            // в самом верху страницы панель закреплённых появляется на глазах —
+            // ничего не компенсируем; ниже — держим карточку под пальцем
+            if (window.scrollY > 0) {
+                const drift = li.getBoundingClientRect().top - anchorViewportTop;
+                if (drift > 2) ensureScrollRoom(window.scrollY + drift);
+                if (Math.abs(drift) > 2) window.scrollBy(0, drift);
+            }
             focusTaskInput();
-            // страницу не прокручиваем: и так понятно, что закреплённое
-            // оказывается в верхнем блоке
-            offerScrollBack(scrollBackFrom);
         }
 
         function renderCompleted() {
@@ -6671,6 +7135,7 @@ theme: 'system',
                 const match = !active || ((textEl ? textEl.textContent : '').toLowerCase().includes(q));
                 li.classList.toggle('search-hidden', !match);
                 if (match) shown++;
+                if (match && textEl) setSearchHighlight(textEl, q);
             });
             countEl.textContent = active ? shown + ' / ' + total : '';
             noResultsEl.style.display = (active && shown === 0 && total > 0) ? 'block' : 'none';
@@ -6690,11 +7155,49 @@ theme: 'system',
             searchClearBtn.setAttribute('aria-label', label);
         }
 
-        // фильтр активных задач: текст + цветовая метка + день календаря (по И)
-        function applySearch() {
+        // подсветка найденных фрагментов: содержимое span пересобирается из
+        // текстовых узлов и <mark> (никакого innerHTML — текст задач
+        // пользовательский). Повторный прогон с тем же запросом — no-op.
+        // Подсветка включается от 2 символов: одиночный символ шумит
+        function setSearchHighlight(el, query) {
+            if (!query || query.length < 2) query = '';
+            if (el._hlQuery === query) return;
+            el._hlQuery = query;
+            const text = el.textContent;
+            const lower = text.toLowerCase();
+            const q = query.toLowerCase();
+            if (!q || lower.indexOf(q) === -1) { el.textContent = text; return; }
+            el.textContent = '';
+            let pos = 0, idx;
+            while ((idx = lower.indexOf(q, pos)) !== -1) {
+                el.appendChild(document.createTextNode(text.slice(pos, idx)));
+                const mark = document.createElement('mark');
+                mark.className = 'search-hit';
+                mark.textContent = text.slice(idx, idx + q.length);
+                el.appendChild(mark);
+                pos = idx + q.length;
+            }
+            el.appendChild(document.createTextNode(text.slice(pos)));
+        }
+
+        // фильтр активных задач: текст + цветовая метка + день календаря (по И).
+        // overrideQuery — текст из окна новой задачи (поиск при наборе); без
+        // параметра берётся поле поиска. Пока активен поиск из окна новой
+        // задачи, все вызовы applySearch() без параметра берут текст из неё —
+        // цветовой фильтр и день календаря не сбивают набранный текст
+        function applySearch(overrideQuery) {
             updateSearchClearIcon();
-            const q = searchInput.value.trim().toLowerCase();
-            const color = activeColorFilter;
+            // typeof-проверка обязательна: searchInput.addEventListener('input', applySearch)
+            // передаёт объект события первым аргументом — он не должен стать запросом
+            const useTyping = typeof overrideQuery !== 'string' && typingSearchActive && searchRow.style.display === 'none';
+            const raw = useTyping ? taskInput.value : (typeof overrideQuery === 'string' ? overrideQuery : searchInput.value);
+            const q = raw.trim().toLowerCase();
+            // поиск из окна новой задачи фильтрует и по выбранной метке новой
+            // задачи; серая метка (null) цветовой фильтр не включает — остаётся
+            // только текстовый поиск
+            const color = (typingSearchActive && searchRow.style.display === 'none')
+                ? currentNewTaskColor
+                : activeColorFilter;
             const cal = calendarDayFilter;
             const active = q !== '' || color !== null || cal !== null;
             let shown = 0, total = 0;
@@ -6702,19 +7205,38 @@ theme: 'system',
                 const isClone = li.classList.contains('clone-task');
                 if (!isClone) total++;
                 const textEl = li.querySelector('.task-text');
-                const textMatch = !q || ((textEl ? textEl.textContent : '').toLowerCase().includes(q));
+                // у задачи под редактированием текстового span нет — сверяемся
+                // с редактором, иначе редактируемая задача исчезала из поиска
+                const editEl = li.querySelector('.task-text-editing');
+                const textValue = editEl ? editEl.value : (textEl ? textEl.textContent : '');
+                const textMatch = !q || textValue.toLowerCase().includes(q);
                 const liColor = li.getAttribute('data-color') || 'none';
                 let match = textMatch && (color === null || liColor === color);
                 // фильтр дня действует только на карточки в блоке дедлайнов
                 if (match && cal && deadlineList.contains(li)) match = calendarMatches(li, cal);
                 li.classList.toggle('search-hidden', !match);
                 if (match && !isClone) shown++;
+                if (match && textEl) setSearchHighlight(textEl, q);
             });
             taskList.classList.toggle('search-active', active);
             const searching = q !== '' || color !== null;
             searchCount.textContent = searching ? shown + ' / ' + total : '';
             syncTasksPanels();
+            // точки в календаре следуют за фильтром: скрытые карточки не рисуются
+            renderTasksCalendar();
             if (updateFilterPalettes()) applySearch();
+        }
+
+        // поиск из окна новой задачи: включается набором текста ИЛИ выбором
+        // цветной метки. Серая метка («без цвета») — работает только текстовый
+        // поиск; выбранная метка фильтрует по цвету сразу, даже без текста.
+        // Открытое окно поиска всегда главнее
+        let typingSearchActive = false;
+        function applyTypingSearch() {
+            if (searchRow.style.display !== 'none') { typingSearchActive = false; return; }
+            typingSearchActive = !!appSettings.searchWhileTyping &&
+                (taskInput.value.trim() !== '' || currentNewTaskColor !== null);
+            applySearch(typingSearchActive ? taskInput.value : '');
         }
 
         // фильтр выполненных задач: текст + цветовая метка
@@ -6731,6 +7253,7 @@ theme: 'system',
                 const match = textMatch && (color === null || liColor === color);
                 li.classList.toggle('search-hidden', !match);
                 if (match) shown++;
+                if (match && textEl) setSearchHighlight(textEl, q);
             });
             completedSearchCount.textContent = active ? shown + ' / ' + total : '';
             completedSearchEmptyMsg.style.display = (active && shown === 0 && total > 0) ? 'block' : 'none';
@@ -6753,8 +7276,9 @@ theme: 'system',
                 syncPaletteSelection();
                 reset = true;
             }
-            // при создании задачи палитра всегда видна, в поиске — по наличию цветных задач
-            colorPalette.style.display = (!searchOpen || showActive) ? 'flex' : 'none';
+            // при создании задачи палитра всегда видна, в поиске — по наличию цветных задач;
+            // прячем через visibility — высота панели не меняется
+            colorPalette.style.visibility = (!searchOpen || showActive) ? 'visible' : 'hidden';
             const showCompleted = completedList.children.length > 0 && Array.from(completedList.children).some(li => li.getAttribute('data-color'));
             if (!showCompleted && completedColorFilter !== null) {
                 completedColorFilter = null;
@@ -6768,14 +7292,40 @@ theme: 'system',
         // Пустое место внизу списков — треть экрана; включаем только когда список
         // действительно прокручивается: короткому списку лишняя пустота не нужна
         function updateTailSpace() {
-            // воздух в пятую часть экрана — под последней видимой панелью
+            // распорка якоря закрепления больше не нужна, если без неё
+            // страница прокручивается не хуже текущей позиции
+            const pinSpacer = document.getElementById('pinScrollSpacer');
+            if (pinSpacer) {
+                const sh = parseFloat(pinSpacer.style.height) || 0;
+                if (document.documentElement.scrollHeight - sh - window.innerHeight >= window.scrollY) pinSpacer.remove();
+            }
+            // воздух в пятую часть экрана — под последним видимым элементом
+            // блоков. В режиме «между блоками» это нижняя полоска чипов
+            // (воздух ставится под НЕЙ, иначе полоска уезжает в самый низ
+            // страницы после пустого хвоста); в остальных режимах воздух
+            // остаётся под последней панелью, как раньше
             const panels = Array.from(document.querySelectorAll('.panel-tasks')).filter(p => p.style.display !== 'none');
             const panel = panels[panels.length - 1];
-            panels.forEach(p => { if (p !== panel) p.classList.remove('tail-space'); });
-            if (panel) {
-                const panelDocBottom = panel.getBoundingClientRect().bottom + window.scrollY;
-                panel.classList.toggle('tail-space', panelDocBottom > window.innerHeight - 15);
+            let tailTarget = panel;
+            if (appSettings.blockNavMode === 'between') {
+                const strips = Array.from(document.querySelectorAll('.block-nav-strip')).filter(s => s.style.display !== 'none');
+                const bottomStrip = strips[strips.length - 1];
+                // полоска — последний элемент, только если она идёт ПОСЛЕ
+                // последней видимой панели
+                if (bottomStrip && panel &&
+                    !(bottomStrip.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+                    tailTarget = bottomStrip;
+                }
             }
+            // меряем ДО изменений классов: снятие «воздуха» уменьшает страницу,
+            // и принудительная раскладка в укороченном состоянии клампит
+            // прокрутку — колесо отскакивало, не докручивая до низа воздуха.
+            // Классы переключаем только на реальном переходе состояния
+            const tailDocBottom = tailTarget ? tailTarget.getBoundingClientRect().bottom + window.scrollY : 0;
+            const shouldHave = tailDocBottom > window.innerHeight - 15;
+            document.querySelectorAll('.panel-tasks, .block-nav-strip').forEach(el => {
+                el.classList.toggle('tail-space', el === tailTarget && shouldHave);
+            });
             const pairs = [['completedList', 'completedModal'], ['trashList', 'trashModal']];
             pairs.forEach(pair => {
                 const ul = document.getElementById(pair[0]);
@@ -6793,15 +7343,21 @@ theme: 'system',
         function setSearchOpen(open) {
             searchRow.style.display = open ? 'flex' : 'none';
             searchBtn.classList.toggle('selected', open);
-            inputWrapper.style.display = open ? 'none' : '';
-            taskInputCounter.style.display = open ? 'none' : '';
-            inputButtons.style.display = open ? 'none' : '';
+            // скрываем через visibility, а не display: строки остаются в раскладке,
+            // высота панели (и позиция списка задач) не меняется — без прыжков
+            inputWrapper.style.visibility = open ? 'hidden' : '';
+            taskInputCounter.style.visibility = open ? 'hidden' : '';
+            inputButtons.style.visibility = open ? 'hidden' : '';
             if (!open) {
                 if (searchInput.value !== '') searchInput.value = '';
                 if (activeColorFilter !== null) activeColorFilter = null;
                 applySearch();
+                // закрыли поиск: если в поле новой задачи остался текст и
+                // настройка включена — возвращаем фильтр по набираемому тексту
+                applyTypingSearch();
                 focusTaskInput();
             } else {
+                typingSearchActive = false;
                 // из поля новой задачи подставляем первое слово — быстрый
                 // поиск «а не добавлена ли она уже»; текст в поле остаётся
                 const firstWord = taskInput.value.trim().split(/\s+/)[0] || '';
@@ -6818,7 +7374,9 @@ theme: 'system',
                         const visibleH = vv ? vv.height : window.innerHeight;
                         const visibleTop = vv ? vv.offsetTop : 0;
                         if (r.top >= visibleTop && r.bottom <= visibleTop + visibleH) return;
-                        window.scrollBy({ top: r.top - (visibleTop + (visibleH - r.height) / 2), behavior: 'smooth' });
+                        // мгновенно, без smooth: плавная прокрутка спорит
+                        // с анимацией клавиатуры — страница выглядит дёрганой
+                        window.scrollBy({ top: r.top - (visibleTop + (visibleH - r.height) / 2), behavior: 'auto' });
                     };
                     const vv = window.visualViewport;
                     const onResize = () => bring();
@@ -6964,8 +7522,9 @@ theme: 'system',
 
         // синхронизация видимости трёх блоков активных задач и пустых состояний
         function syncTasksPanels() {
-            const searching = searchRow.style.display !== 'none' &&
-                (searchInput.value.trim() !== '' || activeColorFilter !== null);
+            const searching = typingSearchActive ||
+                (searchRow.style.display !== 'none' &&
+                (searchInput.value.trim() !== '' || activeColorFilter !== null));
             const vis = ul => Array.from(ul.children).some(li => !li.classList.contains('search-hidden'));
             const show = (panel, ul) => {
                 panel.style.display = (ul.children.length > 0 && (!searching || vis(ul))) ? '' : 'none';
@@ -7006,34 +7565,60 @@ theme: 'system',
         navNoDeadline.innerHTML = LIST_ICON_SVG + '<span class="block-nav-count"></span>';
         navNoDeadline.dataset.block = 'noDeadline';
 
-        // верхняя полоска: кнопка «Вниз» — прокрутка к концу страницы
+        // верхняя полоска: кнопка «Вниз» — прокрутка к концу страницы.
+        // В плавающем режиме полоска липкая: как только она прилипла к верху
+        // (страница прокручена с места), кнопка превращается в «Наверх»;
+        // в статичном режиме полоска уезжает со страницей — всегда «Вниз»
         const navBottomBtn = document.createElement('button');
         navBottomBtn.type = 'button';
         navBottomBtn.className = 'block-nav-btn block-nav-bottom';
         navBottomBtn.innerHTML = ARROW_DOWN_SVG;
         navBottomBtn.title = t('toBottom');
-        navBottomBtn.addEventListener('click', () => {
-            hideScrollBack();
-            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+        navBottomBtn.addEventListener('click', e => {
+            if (isTouchDevice) e.currentTarget.blur();
+            if (navBottomBtn.classList.contains('block-nav-top')) {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+            }
             focusTaskInput();
         });
         blockNav.appendChild(navBottomBtn);
+
+        function updateNavBottomBtn() {
+            const mode = appSettings.blockNavMode || 'floating';
+            const stuck = mode === 'floating' && blockNav.style.display !== 'none' &&
+                blockNav.getBoundingClientRect().top <= 8 && window.scrollY > 0;
+            const isTop = navBottomBtn.classList.contains('block-nav-top');
+            if (stuck === isTop) return;
+            navBottomBtn.classList.toggle('block-nav-top', stuck);
+            navBottomBtn.classList.toggle('block-nav-bottom', !stuck);
+            navBottomBtn.innerHTML = stuck ? ARROW_UP_SVG : ARROW_DOWN_SVG;
+            navBottomBtn.title = stuck ? t('toTop') : t('toBottom');
+        }
 
         // режим полоски чипов: плавающая (липкая при прокрутке), статичные
         // полоски между блоками и внизу страницы, либо выключено
         function applyBlockNavMode() {
             const mode = appSettings.blockNavMode || 'floating';
             const between = mode === 'between';
-            const navShown = [pinnedPanel, deadlinePanel, noDeadlinePanel]
-                .filter(p => p.style.display !== 'none').length;
+            const navVisible = {
+                pinned: pinnedPanel.style.display !== 'none',
+                deadline: deadlinePanel.style.display !== 'none',
+                noDeadline: noDeadlinePanel.style.display !== 'none'
+            };
+            const navShown = Object.values(navVisible).filter(Boolean).length;
             const stripsVisible = navShown > 1;
             // липкость — только в плавающем режиме
             blockNav.style.position = between ? 'static' : 'sticky';
             blockNav.style.top = between ? '' : '6px';
             blockNav.style.display = (mode !== 'off' && navShown > 1) ? 'flex' : 'none';
-            blockNavMid1.style.display = (between && stripsVisible) ? 'flex' : 'none';
-            blockNavMid2.style.display = (between && stripsVisible) ? 'flex' : 'none';
-            blockNavMid3.style.display = (between && stripsVisible) ? 'flex' : 'none';
+            // промежуточная полоска — только если блок НАД ней виден:
+            // иначе она пристаёт к предыдущей полоске вплотную и выглядит дублем
+            blockNavMid1.style.display = (between && stripsVisible && navVisible.pinned) ? 'flex' : 'none';
+            blockNavMid2.style.display = (between && stripsVisible && navVisible.deadline) ? 'flex' : 'none';
+            blockNavMid3.style.display = (between && stripsVisible && navVisible.noDeadline) ? 'flex' : 'none';
+            updateNavBottomBtn();
         }
 
         // кнопка «наверх» на промежуточных полосках (в верхней полоске
@@ -7044,8 +7629,8 @@ theme: 'system',
             btn.className = 'block-nav-btn block-nav-top';
             btn.innerHTML = ARROW_UP_SVG;
             btn.title = t('toTop');
-            btn.addEventListener('click', () => {
-                hideScrollBack();
+            btn.addEventListener('click', e => {
+                if (isTouchDevice) e.currentTarget.blur();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 focusTaskInput();
             });
@@ -7060,7 +7645,10 @@ theme: 'system',
             btn.className = 'block-nav-btn';
             btn.innerHTML = icons[block] + '<span class="block-nav-count"></span>';
             btn.dataset.block = block;
-            btn.addEventListener('click', () => scrollToPanel(block));
+            btn.addEventListener('click', e => {
+                if (isTouchDevice) e.currentTarget.blur();
+                scrollToPanel(block);
+            });
             strip.appendChild(btn);
         }
         [blockNavMid1, blockNavMid2, blockNavMid3].forEach(strip => {
@@ -7071,8 +7659,6 @@ theme: 'system',
         });
 
         function scrollToPanel(block) {
-            // прыжок — осознанная навигация: отменяем запланированный «Вернуться»
-            hideScrollBack();
             const panel = { pinned: pinnedPanel, deadline: deadlinePanel, noDeadline: noDeadlinePanel }[block];
             window.scrollTo({ top: panel.getBoundingClientRect().top + window.scrollY - 8, behavior: 'smooth' });
             focusTaskInput();
@@ -7085,14 +7671,15 @@ theme: 'system',
         }
 
         // у верхних чипов иконки заданы здесь — вешаем клики
-        navPinned.addEventListener('click', () => scrollToPanel('pinned'));
-        navDeadline.addEventListener('click', () => scrollToPanel('deadline'));
-        navNoDeadline.addEventListener('click', () => scrollToPanel('noDeadline'));
+        navPinned.addEventListener('click', e => { if (isTouchDevice) e.currentTarget.blur(); scrollToPanel('pinned'); });
+        navDeadline.addEventListener('click', e => { if (isTouchDevice) e.currentTarget.blur(); scrollToPanel('deadline'); });
+        navNoDeadline.addEventListener('click', e => { if (isTouchDevice) e.currentTarget.blur(); scrollToPanel('noDeadline'); });
 
         // троттлинг по времени — не через rAF: он не срабатывает, когда вкладка
         // не отрисовывается, и обновления залипали
         let blockNavSpyLast = 0;
         window.addEventListener('scroll', () => {
+            updateNavBottomBtn();
             const now = Date.now();
             if (now - blockNavSpyLast < 50) return;
             blockNavSpyLast = now;
@@ -7168,23 +7755,59 @@ theme: 'system',
         // клоны закреплённых задач в блоке закреплённых: интерактивные копии,
         // все действия через resolveTaskLi перенаправляются на оригинал,
         // который остаётся в своём блоке (дедлайны или «без дедлайна»)
+        // распорка внизу страницы: позволяет прокрутке компенсировать рост
+        // блока закреплённых, даже если внизу страницы уже не хватает высоты
+        // (иначе браузер обрежет scrollY и якорь собьётся). Убирается
+        // в updateTailSpace, когда естественной высоты снова хватает
+        function ensureScrollRoom(targetY) {
+            const needed = targetY + window.innerHeight;
+            const deficit = Math.ceil(needed - document.documentElement.scrollHeight);
+            if (deficit <= 0) return;
+            let spacer = document.getElementById('pinScrollSpacer');
+            if (!spacer) {
+                spacer = document.createElement('div');
+                spacer.id = 'pinScrollSpacer';
+                document.getElementById('tasksBlocks').insertAdjacentElement('afterend', spacer);
+            }
+            spacer.style.height = Math.round((parseFloat(spacer.style.height) || 0) + deficit) + 'px';
+        }
+
         function syncPinnedClones() {
             // правка текста идёт прямо в клоне — не трогаем его посреди правки
             if (document.querySelector('.task-text-editing')) return;
+            const panelRect = pinnedPanel.getBoundingClientRect();
+            const panelBottomDoc = panelRect.bottom + window.scrollY;
             const origins = [...deadlineList.children, ...taskList.children]
                 .filter(li => li.classList.contains('pinned') && !li.classList.contains('clone-task'));
             // убрать клоны незакреплённых (открепили или удалили)
             pinnedList.querySelectorAll('.clone-task').forEach(clone => {
                 if (!origins.some(o => o.dataset.id === clone.dataset.id)) clone.remove();
             });
-            // создать недостающие копии наверху, обновить существующие на месте
+            // создать недостающие копии наверху, обновить существующие на месте;
+            // у задачи с идущим отсчётом не пересобираем ничего —
+            // cloneNode скопирует оверлей без обработчиков и отсчёт замрёт
             origins.forEach(orig => {
+                if (orig.classList.contains('pending-move')) return;
                 const fresh = orig.cloneNode(true);
                 fresh.classList.add('clone-task');
+                // одноразовые подсветки (appearing/just-pinned) не наследуем:
+                // на клоне класс остался бы навсегда и переигрывался
+                // при каждой пересборке
+                fresh.classList.remove('appearing', 'just-pinned');
                 const existing = pinnedList.querySelector('li[data-id="' + CSS.escape(orig.dataset.id || '') + '"]');
                 if (existing) existing.replaceWith(fresh);
                 else pinnedList.insertBefore(fresh, pinnedList.firstChild);
             });
+            // блок закреплённых целиком выше вьюпорта: появление/исчезновение
+            // клона сдвигает содержимое под пальцем — держим якорь прокруткой.
+            // Если блок виден хотя бы частично, рост происходит на глазах —
+            // это честная обратная связь, не компенсируем (и на самом верху
+            // страницы тоже: панель появляется, ничего не уезжает)
+            const delta = pinnedPanel.getBoundingClientRect().height - panelRect.height;
+            if (delta !== 0 && window.scrollY > 0 && panelBottomDoc <= window.scrollY + 1) {
+                ensureScrollRoom(window.scrollY + delta);
+                window.scrollBy(0, delta);
+            }
         }
 
         // действие начато на клоне — работаем с оригиналом,
@@ -7415,14 +8038,20 @@ theme: 'system',
             const text = document.createElement('span');
             text.textContent = reminderChipText(ds, rule);
             if (rule) {
-                el.appendChild(text);
-                el.appendChild(icon);
                 const msLeft = new Date(ds) - new Date();
-                if (msLeft > 0 && msLeft <= 7 * 86400000) {
-                    const rel = document.createElement('span');
-                    rel.classList.add('deadline-relative');
-                    rel.textContent = formatDeadlineShort(new Date(ds), true);
-                    el.appendChild(rel);
+                if (msLeft <= 0) {
+                    // наступивший слот: значок повтора перед словом «Наступило»
+                    el.appendChild(icon);
+                    el.appendChild(text);
+                } else {
+                    el.appendChild(text);
+                    el.appendChild(icon);
+                    if (msLeft <= 7 * 86400000) {
+                        const rel = document.createElement('span');
+                        rel.classList.add('deadline-relative');
+                        rel.textContent = formatDeadlineShort(new Date(ds), true);
+                        el.appendChild(rel);
+                    }
                 }
             } else {
                 el.appendChild(icon);
@@ -7503,18 +8132,46 @@ theme: 'system',
             const locale = localeStr();
             let wd = d.toLocaleDateString(locale, { weekday: 'short' });
             wd = wd.charAt(0).toUpperCase() + wd.slice(1);
-            const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+            const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
             const ddmm = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
             return wd + ', ' + time + ', ' + ddmm;
         }
 
-        // текст плашки дедлайна напоминания: расписание или «Наступило» (+ пропущено)
+        // текст плашки дедлайна напоминания: расписание или «Наступило»
+        // с тем, как давно наступил слот:
+        //   меньше часа — «N минут назад»;
+        //   сегодня, но больше часа — «4 ч. 15 мин. назад (в ЧЧ:ММ)» с точным временем слота;
+        //   прошлые дни — «вчера», «позавчера», «N дн назад»
         function reminderChipText(ds, rule) {
             const d = new Date(ds);
             if (!rule || isNaN(d.getTime())) return formatDeadlineShort(d);
             if (d > new Date()) return formatReminderChip(d);
             const missed = countMissedSlots(d, rule);
-            return missed > 0 ? t('reminderDue') + ' · ' + t('missedShort') + ' ' + missed : t('reminderDue');
+            const parts = [t('reminderDue')];
+            const now = new Date();
+            const sameDay = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            const dayDiff = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate())
+                - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+            if (sameDay) {
+                const ageMin = Math.max(0, Math.floor((now - d) / 60000));
+                if (ageMin < 60) {
+                    const mins = Math.max(1, ageMin);
+                    parts.push(mins + ' ' + formatUnitCount(mins, 'minuteAgo') + ' ' + t('agoSuffix'));
+                } else {
+                    const h = Math.floor(ageMin / 60), m = ageMin % 60;
+                    // нулевые минуты не показываем: «4 ч. назад», «4 ч. 15 мин. назад»
+                    parts.push(h + ' ' + t('hourAgoShort') + (m > 0 ? ' ' + m + ' ' + t('minAgoShort') : '') + ' ' + t('agoSuffix'));
+                    parts.push('(' + t('atPreposition') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ')');
+                }
+            } else if (dayDiff === 1) {
+                parts.push(t('yesterday'));
+            } else if (dayDiff === 2) {
+                parts.push(t('dayBeforeYesterday'));
+            } else {
+                parts.push(dayDiff + ' ' + t('daysAgo'));
+            }
+            if (missed > 0) parts.push('·', t('missedShort') + ' ' + missed);
+            return parts.join(' ');
         }
 
         // единица правила «Каждые N …»: полное слово с правильным склонением
@@ -7522,14 +8179,6 @@ theme: 'system',
             const span = document.querySelector('#repeatRow .repeat-btn[data-key="ndays"] .ndays-unit');
             const inp = document.getElementById('repeatEveryInput');
             if (span && inp) span.textContent = formatUnitCount(Math.min(99, Math.max(2, parseInt(inp.value) || 3)), 'day');
-        }
-
-        function updateRepeatIcon(li) {
-            // повтор теперь показывает иконка на плашке дедлайна —
-            // отдельный значок у даты убран, здесь только очистка остатков
-            if (!li) return;
-            const ic = li.querySelector('.task-repeat-icon');
-            if (ic) ic.remove();
         }
 
         function updateRepeatButtons() {
@@ -7675,9 +8324,8 @@ theme: 'system',
             }
 
             const taskLi = currentEditingTask;
-            const scrollBackFrom = window.scrollY;
-
             const old = taskLi.querySelector('.deadline-display');
+            const oldDs = old ? old.dataset.deadline : null;
             if (old) old.remove();
 
             const oldBtn = taskLi.querySelector('.deadline-btn');
@@ -7692,7 +8340,6 @@ theme: 'system',
             } else {
                 delete taskLi.dataset.repeat;
             }
-            updateRepeatIcon(taskLi);
             refreshToggleButton(taskLi);
 
             const comp = taskLi.classList.contains('completed');
@@ -7710,9 +8357,9 @@ theme: 'system',
             }, 100);
 
             closeDeadlineModal();
-            // календарь: точка переезжает на новый день, карточка уходит из выбранного дня
-            calendarAfterDeadlineChange(ds);
-            offerScrollBack(scrollBackFrom);
+            // календарь: точка переезжает на новый день, карточка уходит из выбранного дня;
+            // у повторяющихся точки — слоты серии, перелёт одной точки не показать
+            calendarAfterDeadlineChange(ds, undefined, modalRepeat ? null : oldDs, taskLi.getAttribute('data-color'));
         }
 
         // снять дедлайн (и повтор — без дедлайна повторять нечего)
@@ -7726,14 +8373,13 @@ theme: 'system',
             }
 
             const taskLi = currentEditingTask;
-            const scrollBackFrom = window.scrollY;
 
             const dl = taskLi.querySelector('.deadline-display');
+            const oldDs = dl ? dl.dataset.deadline : null;
             if (dl) dl.remove();
 
             // без дедлайна нечего повторять
             delete taskLi.dataset.repeat;
-            updateRepeatIcon(taskLi);
             refreshToggleButton(taskLi);
 
             taskLi.classList.remove('overdue', 'urgent');
@@ -7762,9 +8408,8 @@ theme: 'system',
             }, 100);
 
             closeDeadlineModal();
-            // календарь: точка с прежнего дня исчезает
-            calendarAfterDeadlineChange(null);
-            offerScrollBack(scrollBackFrom);
+            // календарь: точка с прежнего дня исчезает (тает на месте)
+            calendarAfterDeadlineChange(null, undefined, oldDs, taskLi.getAttribute('data-color'));
         }
 
         function updateDateDisplay(el) {
@@ -7785,7 +8430,7 @@ theme: 'system',
 
         // освежить краткие подписи дедлайнов («осталось 2 ч», у напоминаний — расписание
         // и относительное время); текстовые span'ы ищем по классам, не по позиции:
-        // у напоминаний значок повтора стоит в середине
+        // у напоминаний значок повтора стоит в середине (у наступившего слота — впереди)
         function refreshDeadlineTexts() {
             document.querySelectorAll('.deadline-display').forEach(el => {
                 const host = el.closest('li');
@@ -7794,6 +8439,14 @@ theme: 'system',
                 if (!textEl) return;
                 const newText = reminderChipText(el.dataset.deadline, rule);
                 if (textEl.textContent !== newText) textEl.textContent = newText;
+                // значок повтора: перед текстом у наступившего слота,
+                // после текста (перед относительным временем) у будущего
+                const iconEl = el.querySelector('.deadline-icon');
+                if (iconEl && rule) {
+                    const due = !(new Date(el.dataset.deadline) > new Date());
+                    if (due && el.firstElementChild !== iconEl) el.insertBefore(iconEl, el.firstChild);
+                    else if (!due && el.firstElementChild === iconEl) textEl.after(iconEl);
+                }
                 const relEl = el.querySelector('.deadline-relative');
                 if (!relEl) return;
                 const msLeft = new Date(el.dataset.deadline) - new Date();
@@ -8064,7 +8717,7 @@ theme: 'system',
             if (!st || !cloud.ready) return;
             st.style.color = '';
             if (!cloud.user) { st.textContent = t('syncLoggedOut'); return; }
-            const time = new Date().toLocaleTimeString(localeStr(), { hour: '2-digit', minute: '2-digit' });
+            const time = new Date().toLocaleTimeString(localeStr(), { hour: '2-digit', minute: '2-digit', hour12: false });
             // email-аккаунт без подтверждения — напомним вместо времени
             const unverified = cloud.user.providerData[0] && cloud.user.providerData[0].providerId === 'password'
                 && cloud.user.emailVerified === false;
@@ -8263,7 +8916,9 @@ theme: 'system',
                 listEl.addEventListener('touchstart', (e) => {
                     if (!touchActive() || e.touches.length !== 1) return;
                     const row = e.target.closest('li');
-                    if (!row || row.classList.contains('pending-move') || row.querySelector('.task-overlay')) return;
+                    // во время правки текста горизонтальный жест — это движение
+                    // курсора/выделение, свайп карточки отключаем целиком
+                    if (!row || row.classList.contains('pending-move') || row.querySelector('.task-overlay') || row.querySelector('.task-text-editing')) return;
                     if (e.target.closest('button, .deadline-display, .task-actions, .task-completed-info, .trash-date, .reminder-stats')) return;
                     li = row;
                     decided = null;
