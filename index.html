@@ -329,9 +329,10 @@
         }
         #taskInput {
             width: 100%;
-            /* правый отступ 15px — зона красного крестика очистки; суммарные
-               боковые отступы дают ширину текста P−32 — ровно как у текста
-               карточки задачи (метка 4px + паддинги 12px) */
+            /* асимметричные боковые отступы сохраняют ширину текста P−32 —
+               ровно как у текста карточки задачи (метка 4px + паддинги 12px);
+               раньше справа ещё жил красный крестик очистки — его убрали,
+               отступ оставлен ради выравнивания */
             padding: 6px 15px 6px 11px;
             border: none;
             border-radius: 0 4px 4px 0;
@@ -349,48 +350,10 @@
         .input-wrapper:focus-within {
             border-color: var(--border-focus);
         }
-        /* у новой задачи с повтором индикатор метки — на правом краю поля */
-        .input-wrapper.repeat-pending { flex-direction: row-reverse; }
-        .input-wrapper.repeat-pending .input-color-indicator { border-radius: 0 5px 5px 0; }
         .input-wrapper:has(#taskInput.error) {
             border-color: var(--text-danger);
             background-color: var(--bg-input-error);
         }
-        /* красный крестик очистки поля: живёт в правом отступе textarea (15px),
-           расширенная зона нажатия залезает на край текста — намеренно */
-        .input-clear-btn {
-            position: absolute;
-            top: 50%;
-            right: 1px;
-            transform: translateY(-50%);
-            width: 15px;
-            height: 28px;
-            border: none;
-            background: none;
-            color: var(--text-danger);
-            font-size: 13px;
-            line-height: 1;
-            cursor: pointer;
-            padding: 0;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .input-clear-btn::before {
-            content: '';
-            position: absolute;
-            left: -7px;
-            right: -7px;
-            top: -7px;
-            bottom: -7px;
-        }
-        .input-clear-btn:hover { background: var(--accent-black-hover); }
-        .input-wrapper.has-text .input-clear-btn { display: flex; }
-        /* при выбранном повторе метка справа — крестик смещается влево от неё,
-           а не прячется (очистка поля нужна в любом состоянии) */
-        .input-wrapper.repeat-pending .input-clear-btn { right: 5px; }
         .char-counter {
             font-size: 11px;
             color: var(--text-muted);
@@ -404,10 +367,27 @@
         .char-counter.visible { height: 16px; opacity: 1; }
         .char-counter.warning { color: var(--text-warning); }
         .char-counter.danger { color: var(--text-danger); font-weight: 600; }
-        .input-buttons { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
+        /* ряд под полем: «время» и «+» — ровно по трети ширины, между ними —
+           кнопки правки текста (как в тулбаре редактирования карточки) */
+        .input-buttons { display: flex; gap: 6px; margin-top: 10px; align-items: stretch; }
+        .input-tools {
+            flex: 1 1 0;
+            display: flex; align-items: center; justify-content: center;
+            gap: 2px; min-width: 0; min-height: 30px;
+        }
+        /* компактные кнопки инструментов: в треть ширины на телефоне
+           четыре кнопки помещаются только без минимальных 32px; зона нажатия
+           расширяется псевдоэлементом — сами кнопки тесноваты для пальца */
+        .input-tools .edit-toolbar-btn { min-width: 24px; height: 30px; padding: 4px 4px; position: relative; }
+        .input-tools .edit-toolbar-btn::before { content: ''; position: absolute; inset: 0 -3px; }
+        .input-tools .edit-toolbar-btn svg { width: 14px; height: 14px; }
+        .input-tools .edit-toolbar-btn.text-btn { min-width: auto; }
         #addDeadlineBtn {
             flex: 1;
-            padding: 6px 15px;
+            min-width: 0;
+            /* без горизонтальных паддингов: они несжимаемы и ломали бы
+               ровные трети ряда (иконка и так центрируется) */
+            padding: 6px 0;
             background-color: var(--bg-btn);
             color: var(--text-secondary);
             border: 1px solid var(--border-input);
@@ -422,15 +402,20 @@
             justify-content: center;
             gap: 6px;
         }
-        #addDeadlineBtn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+        /* неактивная кнопка не подсвечивается на наведение и не тянет курсор */
+        #addDeadlineBtn:hover:not(.inactive) { border-color: var(--accent-primary); color: var(--accent-primary); }
+        #addDeadlineBtn.inactive { cursor: default; }
 
         #addDeadlineBtn .deadline-time { font-size: 13px; font-weight: 500; }
+        /* иконки «время» и «+» — в одном стиле: цвет общий, размер и толщина
+           заданы в самих SVG (SET_TIME_SVG / PLUS_SVG, 16px stroke 2.5) */
         #addDeadlineBtn svg { color: var(--accent-primary); }
         #addDeadlineBtn.inactive svg { color: var(--text-muted); }
-        #addDeadlineBtn.inactive:hover svg { color: var(--accent-primary); }
         .deadline-btn svg { color: inherit; }
         #addBtn {
-            width: 40px;
+            flex: 1 1 0;
+            min-width: 0;
+            padding: 0;
             height: 30px;
             background-color: var(--bg-btn);
             color: var(--accent-primary);
@@ -445,11 +430,10 @@
             align-items: center;
             justify-content: center;
             line-height: 1;
-            flex-shrink: 0;
         }
         #addBtn svg { display: block; }
         #addBtn:hover:not(.inactive) { border-color: var(--accent-primary); }
-        #addBtn.inactive { color: var(--text-secondary); cursor: default; }
+        #addBtn.inactive { color: var(--text-muted); cursor: default; }
         ul { list-style-type: none; padding: 0; margin: 0; }
         li {
             background-color: var(--bg-task);
@@ -551,6 +535,11 @@
         li.appearing { animation: slideIn 0.4s ease, highlightNew 1.5s ease; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes highlightNew { 0%, 25% { background-color: var(--bg-highlight-new); } 100% { background-color: var(--bg-task); } }
+        /* подсветка новой задачи / нового дедлайна держится до ПЕРВОГО
+           действия пользователя и гаснет за 2с (гасит armTaskHighlight);
+           highlightNew из анимации убран — фон держится статично */
+        li.appearing.highlight-hold { animation: slideIn 0.4s ease; background-color: var(--bg-highlight-new); }
+        li.highlight-hold.highlight-fade { transition: background-color 2s ease; background-color: var(--bg-task); }
         /* закрепление/открепление: оригинал остаётся на месте —
            только мягкая подсветка фоном, без slideIn (выглядит как скачок) */
         li.just-pinned { animation: highlightNew 1.5s ease; }
@@ -1289,6 +1278,13 @@ font-size: 14px;
             background: none;
             cursor: default;
         }
+        /* кнопка ‹/›, возвращающая выбранный день в окно (когда день ушёл
+           из вида листанием): рамка и фон — как у выбранного дня;
+           box-shadow вместо border, чтобы не двигать раскладку шапки */
+        .calendar-nav-btn.day-return {
+            box-shadow: inset 0 0 0 1.5px var(--accent-primary);
+            background: var(--accent-primary-bg);
+        }
         .calendar-month-year { font-size: 14px; font-weight: 600; color: var(--text-primary); text-transform: capitalize; cursor: pointer; user-select: none; -webkit-user-select: none; }
         .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 2px; }
         .calendar-weekday { text-align: center; font-size: 11px; color: var(--text-muted); font-weight: 600; padding: 4px 0; text-transform: capitalize; }
@@ -1413,6 +1409,11 @@ font-size: 14px;
         }
         .picker-warning.visible { visibility: visible; opacity: 1; }
         .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; }
+        /* в окне новой задачи «Добавить задачу» одна и почти на всю ширину
+           модалки — 5px по бокам (паддинг модалки 25px → вынос 20px); время
+           на ней — тем же стилем, что был на кнопке дедлайна под полем */
+        #addTaskFromModalBtn { flex: 1; margin-left: -20px; margin-right: -20px; }
+        #addTaskFromModalBtn .deadline-time { font-size: 13px; font-weight: 500; opacity: 0.9; }
         .modal-btn { padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
         .modal-btn.primary { background-color: var(--accent-primary); color: white; }
         .modal-btn.primary:hover { background-color: var(--accent-primary-hover); }
@@ -1482,11 +1483,13 @@ font-size: 14px;
             display: flex; align-items: center; gap: 4px;
             padding: 0 6px 6px; position: relative;
         }
-        /* дата с листанием недели слева; авто-отступ перед «−» прижимает
-           −/+ числа строк к правому краю шапки.
+        /* дата с листанием недели слева; −/+ числа строк — по середине
+           между датой и крестиком сброса: авто-отступы с обеих сторон
+           пары делят свободное место шапки пополам.
            «К текущей неделе» скрыта в самом CSS: до первого renderTasksCalendar
            она не нужна, иначе вспыхивает при загрузке страницы */
         #calRowsMinus { margin-left: auto; }
+        #calRowsPlus { margin-right: auto; }
         #calTasksToday { visibility: hidden; }
         .cal-day-clear {
             background: none; border: none; cursor: pointer;
@@ -1873,7 +1876,6 @@ font-size: 14px;
             <div class="input-wrapper" id="inputWrapper">
                 <div class="input-color-indicator" id="inputColorIndicator"></div>
                 <textarea id="taskInput" placeholder="Что нужно сделать?" rows="1" spellcheck="true" lang="ru" autocapitalize="sentences" enterkeyhint="enter"></textarea>
-                <button type="button" id="taskInputClear" class="input-clear-btn" title="Очистить поле" aria-label="Очистить поле" tabindex="-1">✕</button>
             </div>
             <!-- поиск живёт в блоке создания: поле задачи заменяется полем поиска,
                  дедлайн и «+» прячутся, общая палитра переключается на фильтр по цвету -->
@@ -1884,7 +1886,8 @@ font-size: 14px;
             </div>
             <div class="char-counter" id="taskInputCounter"></div>
             <div class="input-buttons" id="inputButtons">
-                <button id="addDeadlineBtn" title="Установить дедлайн"></button>
+                <button id="addDeadlineBtn"></button>
+                <div class="input-tools" id="inputTools"></div>
                 <button id="addBtn" class="inactive"></button>
             </div>
         </div>
@@ -2274,8 +2277,8 @@ font-size: 14px;
         const searchClearBtn = document.getElementById('searchClearBtn');
         const searchEmptyMsg = document.getElementById('searchEmptyMsg');
         const inputWrapper = document.getElementById('inputWrapper');
-        const taskInputClear = document.getElementById('taskInputClear');
         const inputButtons = document.getElementById('inputButtons');
+        const inputTools = document.getElementById('inputTools');
         const taskInputCounter = document.getElementById('taskInputCounter');
         const completedFilterPalette = document.getElementById('completedFilterPalette');
         const completedSearchRow = document.getElementById('completedSearchRow');
@@ -2392,9 +2395,13 @@ font-size: 14px;
         // ====================================================================
         //  SVG-иконки
         // ====================================================================
-        const PLUS_SVG = '<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+        const PLUS_SVG = '<svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
         const CALENDAR_SVG = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>';
         const CLOCK_SVG = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+        // часы для кнопки «Установить время» под полем новой задачи: своя
+        // иконка под 16px (круг r=9 и короткие стрелки — не растянутый
+        // через CSS CLOCK_SVG, тот живёт в карточках и чипах на 1em)
+        const SET_TIME_SVG = '<svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7.5 12 12 15.2 13.6"></polyline></svg>';
         const TRASH_SVG = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.15em"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
         const TRASH_SVG_HEADER = '<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
         const SETTINGS_SVG_HEADER = '<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
@@ -2432,8 +2439,7 @@ font-size: 14px;
                 completedTitle: 'Выполненные задачи', noCompleted: 'Нет выполненных задач',
                 trashTitle: 'Корзина', clearTrash: 'Очистить корзину', trashEmpty: 'Корзина пуста',
                 deadlineTitle: 'Установить время', changeDeadlineTitle: 'Изменить время',
-                installTime: 'Установить время',
-                installSchedule: 'Установить расписание', addTaskFromModal: 'Добавить задачу',
+                addTaskFromModal: 'Добавить задачу',
                 moreFoundPrefix: 'Ещё найдено', moreFoundShowAll: 'показать все',
                 noDayMatches: 'В этом дне совпадений нет',
                 changeTimeTitle: 'Изменить время',
@@ -2528,7 +2534,7 @@ font-size: 14px;
                 inWeek: 'неделю',
                 justNow: 'только что', minAgo: 'мин назад', hoursAgo: 'ч назад', yesterday: 'вчера', daysAgo: 'дн назад',
                 minShort: 'мин', hoursShort: 'ч', daysShort: 'дн.', lessMinute: 'менее минуты',
-                setDeadline: 'Установить время', changeDeadlineChip: 'Нажмите, чтобы изменить дедлайн', openCalendar: 'Открыть календарь',
+                setDeadline: 'Установить время', openCalendar: 'Открыть календарь',
                 deadlineAlertLabel: 'Уведомление в заголовке вкладки',
                 deadlineAlertHint: 'Оставшееся время',
                 deadlineAlertOff: 'Выключено',
@@ -2560,8 +2566,7 @@ farDivider: 'Дальше'
                 completedTitle: 'Completed tasks', noCompleted: 'No completed tasks',
                 trashTitle: 'Trash', clearTrash: 'Empty trash', trashEmpty: 'Trash is empty',
                 deadlineTitle: 'Set time', changeDeadlineTitle: 'Change time',
-                installTime: 'Set time',
-                installSchedule: 'Set schedule', addTaskFromModal: 'Add task',
+                addTaskFromModal: 'Add task',
                 moreFoundPrefix: 'Also found', moreFoundShowAll: 'show all',
                 noDayMatches: 'No matches in this day',
                 changeTimeTitle: 'Change time',
@@ -2656,7 +2661,7 @@ farDivider: 'Дальше'
                 inWeek: 'a week',
                 justNow: 'just now', minAgo: 'min ago', hoursAgo: 'h ago', yesterday: 'yesterday', daysAgo: 'days ago',
                 minShort: 'min', hoursShort: 'h', daysShort: 'd', lessMinute: 'less than a minute',
-                setDeadline: 'Set time', changeDeadlineChip: 'Click to change deadline', openCalendar: 'Open calendar',
+                setDeadline: 'Set time', openCalendar: 'Open calendar',
                 deadlineAlertLabel: 'Tab title notification',
                 deadlineAlertHint: 'Time remaining',
                 deadlineAlertOff: 'Disabled',
@@ -2687,6 +2692,7 @@ farDivider: 'Further'
             return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
         }
         function setIconLabel(el, text) { el.title = text; el.setAttribute('aria-label', text); }
+
         let storageAlertActive = false;
         function notifyStorageError() {
             if (storageAlertActive) return;
@@ -2724,6 +2730,20 @@ theme: 'system',
             calRows: 3
 };
         let appSettings = { ...defaultSettings };
+
+        // кнопки правки текста в ряду под полем новой задачи: тот же набор,
+        // что в тулбаре редактирования карточки (выделить всё / копировать /
+        // вставить / очистить), действует на поле новой задачи
+        const inputToolButtons = createTextToolButtons(taskInput);
+        inputToolButtons.forEach(b => inputTools.appendChild(b));
+        // как в тулбаре правки: mousedown не уводит фокус из поля — выделение
+        // и каретка остаются в textarea; копировать/вставить — исключение,
+        // им нужен фокус для execCommand
+        inputTools.addEventListener('mousedown', function(e) {
+            const btn = e.target.closest('.edit-toolbar-btn');
+            if (btn && (btn.dataset.action === 'copy' || btn.dataset.action === 'paste')) return;
+            e.preventDefault();
+        });
 
         function updateHeaderDate() {
             const now = new Date();
@@ -2787,12 +2807,46 @@ theme: 'system',
             });
         }
 
+        // рамка выбранного дня перерисовывается только по событиям, поэтому
+        // пока карточка схлопывается (removing, 0.4с), она должна следовать
+        // за ней покадрово — иначе стоит на месте и в конце мгновенно
+        // прыгает под новый размер
+        function trackDayFrameWhileRemoving(li) {
+            if (!calendarDayFilter || !deadlineList.contains(li) ||
+                !li.classList.contains('day-outline')) return null;
+            let stop = null;
+            const step = () => {
+                if (!li.isConnected) return;
+                drawDayConnector();
+                stop = requestAnimationFrame(step);
+            };
+            stop = requestAnimationFrame(step);
+            return () => cancelAnimationFrame(stop);
+        }
+
+        // переход max-height от базовых 1500px почти всю анимацию держит
+        // полный размер и схлопывает карточку в последних кадрах; фиксируем
+        // реальную высоту, чтобы removing сжимал её с первого кадра. Inline-
+        // фиксацию делаем с transition:none — иначе фиксация сама запускает
+        // переход 1500px→высота, и removing стартует с текущего значения
+        // того перехода (1500px — ни одного кадра между ними не было)
+        function pinRemovingHeight(li) {
+            li.style.transition = 'none';
+            li.style.maxHeight = li.offsetHeight + 'px';
+            void li.offsetHeight;
+            li.style.transition = '';
+        }
+
         function animateMoveTo(li, targetList, afterMove) {
+            pinRemovingHeight(li);
             li.classList.add('removing');
+            const stopTrack = trackDayFrameWhileRemoving(li);
             setTimeout(() => {
+                if (stopTrack) stopTrack();
                 li.remove();
                 targetList.appendChild(li);
                 li.classList.remove('removing');
+                li.style.maxHeight = '';
                 li.classList.add('appearing');
                 setTimeout(() => li.classList.remove('appearing'), 1500);
                 if (afterMove) afterMove();
@@ -2800,11 +2854,50 @@ theme: 'system',
         }
 
         function animateRemove(li, afterRemove) {
+            pinRemovingHeight(li);
             li.classList.add('removing');
+            const stopTrack = trackDayFrameWhileRemoving(li);
             setTimeout(() => {
+                if (stopTrack) stopTrack();
                 li.remove();
                 if (afterRemove) afterRemove();
             }, 400);
+        }
+
+        // подсветка новой задачи / нового дедлайна (appearing + highlight-hold)
+        // держится до ПЕРВОГО действия пользователя — скролл, тап, клавиша,
+        // колесо — затем гаснет за 2с. События САМОЙ программы не считаются:
+        // автопрокрутка после добавления и восстановление позиции при выборе
+        // дня отыгрывают в первые мгновения, поэтому scroll/wheel слушатели
+        // встают с задержкой 800мс (тап и клавиша в этот момент уже поймали бы
+        // pointerdown/keydown)
+        const heldHighlights = new Set();
+        let highlightFadeArmed = false;
+        function armTaskHighlight(li) {
+            li.classList.add('highlight-hold');
+            heldHighlights.add(li);
+            if (highlightFadeArmed) return;
+            highlightFadeArmed = true;
+            const fade = function() {
+                highlightFadeArmed = false;
+                document.removeEventListener('pointerdown', fade, true);
+                document.removeEventListener('keydown', fade, true);
+                document.removeEventListener('scroll', fade, true);
+                document.removeEventListener('wheel', fade, true);
+                heldHighlights.forEach(function(held) {
+                    if (!held.isConnected) return;
+                    held.classList.add('highlight-fade');
+                    setTimeout(function() { held.classList.remove('appearing', 'highlight-hold', 'highlight-fade'); }, 2100);
+                });
+                heldHighlights.clear();
+            };
+            document.addEventListener('pointerdown', fade, true);
+            document.addEventListener('keydown', fade, true);
+            setTimeout(function() {
+                if (!highlightFadeArmed) return; // уже погасли по тапу/клавише
+                document.addEventListener('scroll', fade, true);
+                document.addEventListener('wheel', fade, true);
+            }, 800);
         }
 
 
@@ -3291,16 +3384,11 @@ theme: 'system',
             return span;
         }
 
-        function createEditToolbar(textarea, autoResize, saveEdit, cancelEdit) {
-            const toolbar = document.createElement('div');
-            toolbar.className = 'edit-toolbar';
-
-            const left = document.createElement('div');
-            left.className = 'edit-toolbar-left';
-
-            const right = document.createElement('div');
-            right.className = 'edit-toolbar-right';
-
+        // ==== набор кнопок правки текста: «выделить всё», «копировать»,
+        // «вставить», «очистить» (ластик, при выделении превращается в DEL).
+        // Общий для тулбара редактирования карточки и ряда под полем новой
+        // задачи — поведение в обоих местах одинаковое ====
+        function createTextToolButtons(textarea) {
             const btnSelect = document.createElement('button');
             btnSelect.className = 'edit-toolbar-btn';
             btnSelect.innerHTML = SELECT_ALL_SVG;
@@ -3326,6 +3414,7 @@ theme: 'system',
             btnCopy.innerHTML = COPY_SVG;
             btnCopy.title = t('copyAll');
             btnCopy.type = 'button';
+            btnCopy.setAttribute('data-action', 'copy');
 
             // отслеживаем выделение на ВСЕХ изменениях, включая свёртывание:
             // иначе после перемещения каретки стрелками копировался бы
@@ -3478,6 +3567,29 @@ theme: 'system',
                 textarea.focus();
                 updateClearButton();
             });
+
+            const buttons = [btnSelect, btnCopy, btnPaste, btnClear];
+            // подсказки зависят от языка и состояния выделения: обновляются
+            // и здесь, и при смене языка через applyLanguage
+            buttons.refreshTitles = function() {
+                btnPaste.title = t('paste');
+                trackSelection();
+                updateClearButton();
+            };
+            return buttons;
+        }
+
+        function createEditToolbar(textarea, autoResize, saveEdit, cancelEdit) {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'edit-toolbar';
+
+            const left = document.createElement('div');
+            left.className = 'edit-toolbar-left';
+
+            const right = document.createElement('div');
+            right.className = 'edit-toolbar-right';
+
+            const [btnSelect, btnCopy, btnPaste, btnClear] = createTextToolButtons(textarea);
 
             const btnCancel = document.createElement('button');
             btnCancel.className = 'edit-toolbar-btn text-btn';
@@ -3726,7 +3838,9 @@ theme: 'system',
             taskInput.lang = lang;
             taskInput.placeholder = t('placeholder');
             emptyMsg.textContent = t('emptyList');
-            setIconLabel(addDeadlineBtn, pendingDeadline ? t('changeDeadlineChip') : t('setDeadline'));
+            // подсказки (title) убраны — только aria-label для скринридеров
+            addDeadlineBtn.setAttribute('aria-label', t('setDeadline'));
+            inputToolButtons.refreshTitles();
             setIconLabel(completedBtn, t('completedTitle'));
             setIconLabel(trashBtn, t('trashTitle'));
             setIconLabel(settingsBtn, t('settingsTitle'));
@@ -3734,7 +3848,7 @@ theme: 'system',
             setIconLabel(closeTrashBtn, t('close'));
             setIconLabel(cancelDeadlineBtn, t('cancelEsc'));
             setIconLabel(closeSettingsBtn, t('closeEsc'));
-            setIconLabel(addBtn, t('addTask'));
+            addBtn.setAttribute('aria-label', t('addTask'));
             setIconLabel(searchBtn, t('search'));
             searchInput.placeholder = t('searchPlaceholder');
             document.querySelectorAll('.block-nav-top').forEach(b => { b.title = t('toTop'); });
@@ -4262,12 +4376,6 @@ theme: 'system',
             clearTaskInputSelection();
         });
 
-        // красный крестик в правом отступе поля: очистка одной кнопкой —
-        // тот же сброс, что и по Esc
-        taskInputClear.addEventListener('click', function() {
-            resetTaskInput();
-            taskInput.focus();
-        });
 
         // фокус теряется самыми разными путями (автопрокрутка средней кнопкой
         // мыши, закрытия окон, переходы по спискам). Первое печатаемое
@@ -4332,28 +4440,28 @@ theme: 'system',
         }
 
         function updateAddButton() {
-            inputWrapper.classList.toggle('has-text', taskInput.value !== '');
             if (taskInput.value.trim() === '' || taskInput.value.length > getMaxTaskLength()) addBtn.classList.add('inactive');
             else addBtn.classList.remove('inactive');
         }
 
         function updateDeadlineButtonState() {
-            if (pendingDeadline) addDeadlineBtn.classList.remove('inactive');
-            else if (taskInput.value.trim() === '') addDeadlineBtn.classList.add('inactive');
-            else addDeadlineBtn.classList.remove('inactive');
+            // обе кнопки ряда («время» и «+») активны только с текстом в поле
+            addDeadlineBtn.classList.toggle('inactive',
+                taskInput.value.trim() === '' || taskInput.value.length > getMaxTaskLength());
         }
 
         addDeadlineBtn.addEventListener('click', function() {
+            if (addDeadlineBtn.classList.contains('inactive')) { focusTaskInput(); return; }
             currentEditingTask = null;
-            modalTitle.textContent = pendingDeadline ? t('changeDeadlineTitle') : t('deadlineTitle');
-            openDeadlineModal(null, pendingDeadline);
+            modalTitle.textContent = t('deadlineTitle');
+            openDeadlineModal(null, null);
         });
 
         saveDeadlineBtn.addEventListener('click', saveDeadline);
-        // «Добавить задачу» в окне дедлайна новой задачи: применить выбранное
-        // время/расписание и сразу добавить задачу. saveDeadline закрывает
-        // окно при успехе; если время в прошлом — окно остаётся с
-        // предупреждением и добавления не происходит
+        // «Добавить задачу» в окне дедлайна новой задачи: выбранное время
+        // проверяется и сразу уходит в создаваемую задачу. saveDeadline
+        // закрывает окно при успехе; если время в прошлом — окно остаётся
+        // с предупреждением и добавления не происходит
         addTaskFromModalBtn.addEventListener('click', function() {
             saveDeadline();
             if (!deadlineModal.classList.contains('active')) addTask();
@@ -4654,7 +4762,9 @@ theme: 'system',
                     }
                 }
 
-                // Enter: с открытым календарём — закрыть его, иначе сохранить
+                // Enter: с открытым календарём — закрыть его; в окне новой
+                // задачи — «Добавить задачу» (создаёт задачу с выбранным
+                // временем), у существующей — сохранить дедлайн, как раньше
                 if (e.key === 'Enter') {
                     if (calendarOpen) {
                         if (focusInsideCalendar) return;
@@ -4665,7 +4775,8 @@ theme: 'system',
                     }
 
                     e.preventDefault();
-                    saveDeadline();
+                    if (currentEditingTask === null) addTaskFromModalBtn.click();
+                    else saveDeadline();
                 }
                 // Esc: сначала календарь, потом само окно
                 else if (e.key === 'Escape') {
@@ -4680,6 +4791,9 @@ theme: 'system',
                 else if (e.key === 'Delete' && !isIn) {
                     if (focusInsideCalendar) return;
 
+                    // в окне новой задачи кнопки «Удалить» больше нет —
+                    // Delete не действует
+                    if (currentEditingTask === null) return;
                     e.preventDefault();
                     removeDeadline();
                 }
@@ -5183,6 +5297,19 @@ theme: 'system',
             const weekSunday = new Date(weekStart); weekSunday.setDate(weekSunday.getDate() + 6);
             document.getElementById('calTasksToday').style.visibility =
                 (start.getTime() <= weekStart.getTime() && end.getTime() >= weekSunday.getTime()) ? 'hidden' : 'visible';
+            // кнопка ‹/›, возвращающая выбранный день в окно (день ушёл из
+            // вида листанием), подсвечивается как выбранный день — линию от
+            // рамки рисует drawDayConnector к этой же кнопке
+            const prevNav = document.getElementById('calTasksPrev');
+            const nextNav = document.getElementById('calTasksNext');
+            let dayReturnBtn = null;
+            if (calendarDayFilter && calendarDayFilter.type === 'day') {
+                const day = new Date(calendarDayFilter.y, calendarDayFilter.m, calendarDayFilter.d);
+                if (calWindowStart && day < start) dayReturnBtn = prevNav;
+                else if (day > end) dayReturnBtn = nextNav;
+            }
+            prevNav.classList.toggle('day-return', dayReturnBtn === prevNav);
+            nextNav.classList.toggle('day-return', dayReturnBtn === nextNav);
             // подписи дней недели: сокращения из словаря (Пон Вт Ср…), неделя с понедельника
             document.getElementById('calTasksWeekdays').innerHTML =
                 t('weekdaysShort').map(x => '<div class="cal-weekday">' + x + '</div>').join('');
@@ -5252,7 +5379,13 @@ theme: 'system',
         // грани первой карточки, не задевая соседние дни. Сторона выхода —
         // в сторону задач (центр группы); у крайних колонок — единственная
         // существующая сторона. Вызывается после любой перерисовки
-        // календаря/списка
+        // календаря/списка.
+        // Если день ушёл из окна листанием ‹/› (стрелки клавиатуры, в
+        // отличие от этих кнопок, гонят окно за выбором), день остаётся
+        // выбранным и рамка вокруг его задач НЕ пропадает: линия ведёт к
+        // кнопке, возвращающей день в окно (день раньше окна — ‹, позже —
+        // ›), проходит между дней — в зазоре колонок, ближайшем к кнопке —
+        // и заканчивается прямо под ней
         function drawDayConnector() {
             const panel = document.getElementById('deadlinePanel');
             let svg = document.getElementById('dayConnectorSvg');
@@ -5262,7 +5395,7 @@ theme: 'system',
                 ? Array.from(deadlineList.children).filter(li =>
                     li.classList.contains('day-outline') && !li.classList.contains('search-hidden'))
                 : [];
-            if (!cell || !outlined.length || panel.style.display === 'none') {
+            if ((!cell && !outlined.length) || panel.style.display === 'none') {
                 if (svg) svg.remove();
                 return;
             }
@@ -5274,12 +5407,10 @@ theme: 'system',
             const svgRect = svg.getBoundingClientRect();
             svg.setAttribute('viewBox', '0 0 ' + panel.clientWidth + ' ' + panel.clientHeight);
             const cells = Array.from(document.querySelectorAll('#calTasksDays .cal-cell'));
-            const idx = cells.indexOf(cell);
             const rel = r => ({
                 left: r.left - svgRect.left, right: r.right - svgRect.left,
                 top: r.top - svgRect.top, bottom: r.bottom - svgRect.top
             });
-            const sel = rel(cell.getBoundingClientRect());
             // единая рамка вокруг всей группы задач дня: габарит обведённых
             // карточек с запасом 4px (промежутки между карточками накрываются).
             // Габарит — по offsetTop/offsetLeft: они НЕ учитывают transform,
@@ -5296,29 +5427,57 @@ theme: 'system',
             const frameT = Math.min(...rects.map(r => r.top)) - 4;
             const frameB = Math.max(...rects.map(r => r.bottom)) + 4;
             const targetX = (frameL + frameR) / 2;
-            const col = idx % 7;
-            // сторона выхода — к задачам, но только там, где у колонки есть зазор
-            const wantRight = targetX >= (sel.left + sel.right) / 2;
-            const dir = (wantRight && col < 6) || (!wantRight && col === 0) ? 1 : -1;
-            // зазор между выбранной колонкой и соседней
-            let chX;
-            if (dir === 1) {
-                const next = rel(cells[idx + 1].getBoundingClientRect());
-                chX = (sel.right + next.left) / 2;
+            let pts;
+            if (cell) {
+                const idx = cells.indexOf(cell);
+                const sel = rel(cell.getBoundingClientRect());
+                const col = idx % 7;
+                // сторона выхода — к задачам, но только там, где у колонки есть зазор
+                const wantRight = targetX >= (sel.left + sel.right) / 2;
+                const dir = (wantRight && col < 6) || (!wantRight && col === 0) ? 1 : -1;
+                // зазор между выбранной колонкой и соседней
+                let chX;
+                if (dir === 1) {
+                    const next = rel(cells[idx + 1].getBoundingClientRect());
+                    chX = (sel.right + next.left) / 2;
+                } else {
+                    const prev = rel(cells[idx - 1].getBoundingClientRect());
+                    chX = (prev.right + sel.left) / 2;
+                }
+                const x0 = dir === 1 ? sel.right : sel.left;
+                const y0 = sel.bottom;
+                // точка на дуге скругления, из которой диагональ уходит наружу
+                const k = 8 * (1 - Math.SQRT1_2);
+                const sx = x0 - dir * k, sy = y0 - k;
+                pts = [
+                    sx + ',' + sy,
+                    chX + ',' + (sy + dir * (chX - sx)),
+                    chX + ',' + frameT
+                ];
             } else {
-                const prev = rel(cells[idx - 1].getBoundingClientRect());
-                chX = (prev.right + sel.left) / 2;
+                // день вне окна: линия ведёт к кнопке ‹/›, возвращающей день
+                // в окно (день раньше окна — ‹, позже — ›), и проходит между
+                // дней — в зазоре колонок, ближайшем к этой кнопке
+                const day = new Date(f.y, f.m, f.d);
+                const meta = calendarWindowMeta();
+                const windowEnd = calWindowStart ? new Date(calWindowStart) : null;
+                if (windowEnd) windowEnd.setDate(windowEnd.getDate() + meta.rows * 7 - 1);
+                const toPrev = calWindowStart && day < calWindowStart;
+                const navBtn = document.getElementById(toPrev ? 'calTasksPrev' : 'calTasksNext');
+                const btnRect = rel(navBtn.getBoundingClientRect());
+                const btnX = (btnRect.left + btnRect.right) / 2;
+                const btnY = btnRect.bottom + 1;
+                let chX = btnX, best = Infinity;
+                for (let i = 0; i + 1 < cells.length; i++) {
+                    if (i % 7 === 6) continue; // стык рядов — не зазор между колонками
+                    const a = rel(cells[i].getBoundingClientRect());
+                    const b = rel(cells[i + 1].getBoundingClientRect());
+                    const gx = (a.right + b.left) / 2;
+                    const d = Math.abs(gx - btnX);
+                    if (d < best) { best = d; chX = gx; }
+                }
+                pts = [ chX + ',' + btnY, chX + ',' + frameT ];
             }
-            const x0 = dir === 1 ? sel.right : sel.left;
-            const y0 = sel.bottom;
-            // точка на дуге скругления, из которой диагональ уходит наружу
-            const k = 8 * (1 - Math.SQRT1_2);
-            const sx = x0 - dir * k, sy = y0 - k;
-            const pts = [
-                sx + ',' + sy,
-                chX + ',' + (sy + dir * (chX - sx)),
-                chX + ',' + frameT
-            ];
             svg.innerHTML =
                 '<rect x="' + frameL + '" y="' + frameT + '" width="' + (frameR - frameL) +
                 '" height="' + (frameB - frameT) + '" rx="10"/>' +
@@ -6626,6 +6785,7 @@ theme: 'system',
             refreshPastWarning();
             updateYearGradient();
             updatePresetHighlight();
+            updateModalAddBtn();
         }
 
         function handleFieldInput(field, el) {
@@ -6695,6 +6855,7 @@ theme: 'system',
             } else if (f === 'minute') {
                 modalDateTime.setMinutes(v);
             }
+            updateModalAddBtn();
         }
 
         function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
@@ -6868,7 +7029,7 @@ theme: 'system',
                 else taskList.appendChild(li);
             } else { taskList.appendChild(li); }
             li.classList.add('appearing');
-            setTimeout(() => li.classList.remove('appearing'), 1500);
+            armTaskHighlight(li);
             sortTasks();
             updateCollapseState();
             taskInput.value = '';
@@ -6878,6 +7039,28 @@ theme: 'system',
             updateDeadlineButtonState();
             updateCharCounter(taskInput, document.getElementById('taskInputCounter'));
             applyTypingSearch();
+            // новая задача с дедлайном на день, отличный от выбранного в
+            // календаре: выбираем день новой задачи — окно следует за выбором,
+            // как у стрелок, карточка перестаёт быть day-hidden и доигрывает
+            // appearing-анимацию уже видимой; прокрутка к ней — общий блок ниже
+            const newChip = li.querySelector('.deadline-display');
+            if (newChip && calendarDayFilter && calendarDayFilter.type === 'day' &&
+                li.classList.contains('day-hidden')) {
+                const nd = new Date(newChip.dataset.deadline);
+                if (!isNaN(nd.getTime())) {
+                    const ndDay = new Date(nd.getFullYear(), nd.getMonth(), nd.getDate());
+                    const meta = calendarWindowMeta();
+                    const windowEnd = new Date(calWindowStart);
+                    windowEnd.setDate(windowEnd.getDate() + meta.rows * 7 - 1);
+                    if (ndDay < calWindowStart) {
+                        calWeekOffset -= Math.ceil(Math.round((calWindowStart - ndDay) / 86400000) / 7);
+                    } else if (ndDay > windowEnd) {
+                        calWeekOffset += Math.ceil(Math.round((ndDay - windowEnd) / 86400000) / 7);
+                    }
+                    if (taskInfoPopup) closeTaskInfoPopup();
+                    setCalendarFilter({ type: 'day', y: nd.getFullYear(), m: nd.getMonth(), d: nd.getDate() });
+                }
+            }
             pendingDeadline = null;
             pendingRepeat = null;
             updatePendingDeadlineButton();
@@ -6898,43 +7081,15 @@ theme: 'system',
             setTimeout(checkDeadlineAlerts, 200);
         }
 
-        // кнопка дедлайна под полем ввода: показывает назначенный дедлайн
-        // новой задачи; перерисовывается только при изменении (вызывается таймером)
+        // кнопка дедлайна под полем ввода: время больше не назначается заранее —
+        // модалка сразу создаёт задачу с выбранным временем (или его отменяют),
+        // поэтому на кнопке нет текста времени, только часы; она просто
+        // открывает модалку. Вызывается таймером и из нескольких мест
         function updatePendingDeadlineButton() {
-            let newHtml, newTitle;
-            if (pendingDeadline) {
-                const deadline = new Date(pendingDeadline);
-                // с повтором вместо часов — иконка повтора, справа — правило, а не время
-                const icon = pendingRepeat ? REPEAT_ICON_SVG : CLOCK_SVG;
-                newHtml = '<span class="deadline-time">' + formatFullDate(deadline) + '</span> ' + icon;
-
-                if (pendingRepeat) {
-                    newHtml += ' <span class="deadline-time">' + repeatRuleText(pendingRepeat) + '</span>';
-                } else {
-                    const msLeft = deadline.getTime() - Date.now();
-                    // Относительное время показываем только в пределах недели.
-                    // Дальше formatDeadlineShort() вернул бы опять дату — она уже есть слева.
-                    // Для просроченного дедлайна здесь будет «Просрочено».
-                    if (msLeft <= 7 * 86400000) {
-                        newHtml += ' <span class="deadline-time">' + formatDeadlineShort(deadline) + '</span>';
-                    }
-                }
-
-                newTitle = t('changeDeadlineChip');
-            } else {
-                newHtml = CLOCK_SVG;
-                newTitle = t('setDeadline');
-            }
-    if (updatePendingDeadlineButton._lastHtml !== newHtml) {
-        addDeadlineBtn.innerHTML = newHtml;
-        updatePendingDeadlineButton._lastHtml = newHtml;
-    }
-    // при установленном повторе индикатор метки — на правый край поля ввода
-    const inputWrap = document.querySelector('.input-wrapper');
-    if (inputWrap) inputWrap.classList.toggle('repeat-pending', !!pendingRepeat);
-            if (updatePendingDeadlineButton._lastTitle !== newTitle) {
-                setIconLabel(addDeadlineBtn, newTitle);
-                updatePendingDeadlineButton._lastTitle = newTitle;
+            const html = SET_TIME_SVG;
+            if (updatePendingDeadlineButton._lastHtml !== html) {
+                addDeadlineBtn.innerHTML = html;
+                updatePendingDeadlineButton._lastHtml = html;
             }
             updateDeadlineButtonState();
         }
@@ -7482,7 +7637,6 @@ theme: 'system',
             // тихое состояние: нет поиска и выбранного дня — только тогда
             // действует горизонт дальних задач
             const quiet = !cal && q === '' && color === null;
-            const active = q !== '' || color !== null || cal !== null;
             let shown = 0, total = 0, moreFound = 0, dayMatches = 0;
             document.querySelectorAll('#tasksBlocks li').forEach(li => {
                 const isClone = li.classList.contains('clone-task');
@@ -7543,8 +7697,10 @@ theme: 'system',
                     moreNote.style.display = 'none';
                 }
             }
-            taskList.classList.toggle('search-active', active);
             const searching = q !== '' || color !== null;
+            // search-active — признак именно ПОИСКА (текст/метка): выбранный
+            // день задач без дедлайна не касается и перетаскивание не глушит
+            taskList.classList.toggle('search-active', searching);
             searchCount.textContent = searching ? shown + ' / ' + total : '';
             syncTasksPanels();
             // точки в календаре следуют за фильтром: скрытые карточки не рисуются
@@ -8136,7 +8292,7 @@ theme: 'system',
                 // одноразовые подсветки (appearing/just-pinned) не наследуем:
                 // на клоне класс остался бы навсегда и переигрывался
                 // при каждой пересборке
-                fresh.classList.remove('appearing', 'just-pinned');
+                fresh.classList.remove('appearing', 'just-pinned', 'highlight-hold', 'highlight-fade');
                 const existing = pinnedList.querySelector('li[data-id="' + CSS.escape(orig.dataset.id || '') + '"]');
                 if (existing) existing.replaceWith(fresh);
                 else pinnedList.insertBefore(fresh, pinnedList.firstChild);
@@ -8532,22 +8688,43 @@ theme: 'system',
                 const inp = document.getElementById('repeatEveryInput');
                 if (inp) inp.value = modalRepeat.every;
             }
-            // в окне новой задачи кнопка сохранения называется по действию
-            // («Установить время»/«Установить расписание»), а при непустом
-            // тексте рядом с ней появляется кнопка добавления задачи
+            // в окне новой задачи единственная кнопка — «Добавить задачу» во
+            // всю ширину: выбранное время сразу уходит в создаваемую задачу,
+            // отдельные «Установить время/расписание» и «Удалить» убраны
             if (currentEditingTask === null) {
-                saveDeadlineBtn.textContent = modalRepeat ? t('installSchedule') : t('installTime');
+                saveDeadlineBtn.style.display = 'none';
                 const hasText = taskInput.value.trim() !== '';
                 addTaskFromModalBtn.style.display = hasText ? '' : 'none';
-                saveDeadlineBtn.classList.toggle('primary', !hasText);
-                saveDeadlineBtn.classList.toggle('secondary', hasText);
+                updateModalAddBtn();
             } else {
+                saveDeadlineBtn.style.display = '';
                 saveDeadlineBtn.textContent = t('save');
                 saveDeadlineBtn.classList.add('primary');
                 saveDeadlineBtn.classList.remove('secondary');
                 addTaskFromModalBtn.style.display = 'none';
             }
             updateNdaysUnitText();
+        }
+
+        // надпись на кнопке добавления в окне новой задачи: «Добавить задачу:
+        // <дата>» и далее правило повтора либо относительное время в скобках
+        // («через 30 минут») — тот же формат, каким раньше жила назначенная
+        // дата на кнопке дедлайна под полем; обновляется при каждом изменении
+        function updateModalAddBtn() {
+            if (currentEditingTask !== null) return;
+            if (!modalDateTime || isNaN(modalDateTime.getTime())) return;
+            let html = escapeHtml(t('addTaskFromModal')) + ': <span class="deadline-time">' +
+                escapeHtml(formatFullDate(modalDateTime)) + '</span>';
+            if (modalRepeat) {
+                html += ' ' + REPEAT_ICON_SVG + ' <span class="deadline-time">' +
+                    escapeHtml(repeatRuleText(modalRepeat)) + '</span>';
+            } else if (modalDateTime.getTime() - Date.now() <= 7 * 86400000) {
+                html += ' <span class="deadline-time">(' + escapeHtml(formatDeadlineShort(modalDateTime)) + ')</span>';
+            }
+            if (addTaskFromModalBtn._lastHtml !== html) {
+                addTaskFromModalBtn.innerHTML = html;
+                addTaskFromModalBtn._lastHtml = html;
+            }
         }
 
         // При выполнении повторяющейся задачи создаём следующий экземпляр серии;
@@ -8606,7 +8783,9 @@ theme: 'system',
 
         function openDeadlineModal(li, cd) {
             currentEditingTask = li;
-            removeDeadlineBtn.style.visibility = cd ? 'visible' : 'hidden';
+            // display, а не visibility: в окне новой задачи «Удалить» убрано
+            // совсем, и «Добавить задачу» занимает всю ширину модалки
+            removeDeadlineBtn.style.display = cd ? '' : 'none';
 
             if (cd) {
                 const parsed = new Date(cd);
@@ -8705,7 +8884,7 @@ theme: 'system',
             if (!comp) updateTaskHandle(taskLi, false, true);
 
             taskLi.classList.add('appearing');
-            setTimeout(() => taskLi.classList.remove('appearing'), 1500);
+            armTaskHighlight(taskLi);
 
             sortTasks();
             saveTasks();
@@ -8756,7 +8935,7 @@ theme: 'system',
             }
 
             taskLi.classList.add('appearing');
-            setTimeout(() => taskLi.classList.remove('appearing'), 1500);
+            armTaskHighlight(taskLi);
 
             sortTasks();
             saveTasks();
