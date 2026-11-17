@@ -4,6 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Мои задачи</title>
+    <script>
+    // тема ДО первой отрисовки: большой инлайн-файл рисуется постепенно, и
+    // первый кадр успевает отыграть светлую тему до DOMContentLoaded/applyTheme —
+    // на телефоне это белый-светлый кадр перед тёмной (apk)
+    (function () {
+        try {
+            var s = JSON.parse(localStorage.getItem('appSettings') || '{}');
+            var t = s.theme || 'system';
+            if (t === 'system') t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', t);
+        } catch (e) { /* хранилище недоступно — перекрасит applyTheme */ }
+    })();
+    </script>
     <meta name="theme-color" content="#007bff">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -712,9 +725,13 @@
             cursor: pointer;
             padding: 0;
             /* динамическая ширина: заполняет свободное место от ручки/плашки
-               до строки действий; минимум — прежний размер кнопки */
+               до строки действий. Минимума НЕТ (просьба пользователя: у широкой
+               плашки повтора минимум 40px уводил кнопку на вторую строку) —
+               минимум по умолчанию = ширина иконки 14px. Отрицательный отступ
+               компенсирует часть 8px-зазора meta-left: при широкой плашке
+               свободных 21px не хватало ровно на 14+8=22 */
             flex: 1 1 auto;
-            min-width: 40px;
+            margin-left: -5px;
             height: 28px;
             display: inline-flex;
             align-items: center;
@@ -812,6 +829,26 @@
         .edit-toolbar-btn.with-border {
             box-shadow: inset 0 0 0 1.5px currentColor;
         }
+        /* удержание Отмены при изменённом тексте: подложка заполняется слева
+           направо за 2с (длительность синхронна с CANCEL_HOLD_MS в
+           createEditToolbar); отпускание раньше — быстрый обратный слив */
+        .edit-toolbar-btn { position: relative; }
+        .edit-toolbar-btn .hold-fill {
+            position: absolute;
+            inset: 0;
+            background: var(--text-danger);
+            opacity: 0.25;
+            transform: scaleX(0);
+            transform-origin: left center;
+            pointer-events: none;
+            transition: transform 0.25s ease;
+        }
+        .edit-toolbar-btn.hold-active .hold-fill { transform: scaleX(1); transition: transform 2s linear; }
+        .edit-toolbar-btn.hold-capable {
+            touch-action: none; /* палец не уводится в скролл посреди удержания */
+            user-select: none;
+            -webkit-user-select: none;
+        }
         .edit-overlay {
             position: fixed;
             top: 0;
@@ -845,16 +882,19 @@
             animation: pickerFadeIn 0.15s ease;
         }
         li.color-picker-active { pointer-events: none; z-index: 10000; overflow: hidden; }
+        /* полоса плашек НАД карточкой: overflow виден, иначе плашки обрежутся;
+           колонки клика меток в этом режиме точные (см. --col-top/--col-h) */
+        li.color-picker-active.picker-above { overflow: visible; }
         li.color-picker-active .task-color-picker { pointer-events: auto; }
         .color-picker-blocker { position: fixed; inset: 0; z-index: 9999; background: transparent; touch-action: pan-y; }
-        /* пикер открыт: колонка клика каждой метки — на всю высоту карточки
-           (overflow hidden у li обрезает зоны по границам карточки, тапы
-           выше/ниже карточки закрывают пикер через блокер, как раньше).
-           ±300px хватает на любые карточки; визуальная полоска остаётся
-           узкой, в точке клика */
+        /* зоны попадания меток: по умолчанию ±300px (режим «плашки внутри
+           карточки», режутся overflow:hidden по границам карточки); в режиме
+           «над карточкой» JS ставит точные границы колонки — от верхней
+           границы карточки до её нижней, без обрезки */
         .task-color-picker .color-dot::before {
-            top: -300px;
-            bottom: -300px;
+            top: var(--col-top, -300px);
+            height: var(--col-h, 700px);
+            bottom: auto;
         }
 
 
@@ -1160,6 +1200,19 @@ font-size: 14px;
         .settings-backup { border-top: 1px solid var(--border-backup); padding-top: 15px; margin-top: 5px; flex-direction: column; align-items: stretch; }
         .settings-backup > label { margin-bottom: 8px; }
         .backup-buttons { display: flex; gap: 8px; }
+        /* секция системных разрешений Android (только в обёртке APK):
+           та же колонка-группа, что и у бэкапа, но со своим классом —
+           селектор .settings-backup > label в applyLanguage должен
+           оставаться адресован бэкапу */
+        .settings-phone { border-top: 1px solid var(--border-divider); padding-top: 15px; margin-top: 5px; flex-direction: column; align-items: stretch; }
+        .settings-phone > label { margin-bottom: 8px; }
+        /* кнопки системных разрешений — столбиком, во всю ширину группы */
+        .phone-buttons { display: flex; flex-direction: column; gap: 8px; }
+        .phone-buttons .modal-btn-outline { width: 100%; }
+        .phone-buttons .modal-btn-outline:hover {
+            background-color: var(--accent-primary-bg);
+            color: var(--accent-primary);
+        }
         .settings-danger { border-top: 1px solid var(--border-danger); padding-top: 15px; margin-top: 5px; }
         .settings-sync { border-top: 1px solid var(--border-backup); padding-top: 15px; margin-top: 5px; flex-direction: column; align-items: stretch; }
         .sync-status { font-size: 11px; color: var(--text-muted); margin: 4px 0 8px 0; min-height: 14px; }
@@ -2366,6 +2419,14 @@ font-size: 14px;
                     <input type="text" id="settingPhoneRemindRepeatsMin" inputmode="numeric" pattern="[0-9]*" maxlength="5">
                 </div>
             </div>
+            <div class="settings-group settings-phone" id="phoneSection" style="display: none;">
+                <label id="phoneSectionLabel">Разрешения Android</label>
+                <div class="settings-hint" id="phoneSectionHint">напоминания приходят и при закрытом приложении; если пуш не пришёл — проверьте, что уведомления разрешены и батарея не ограничивает приложение</div>
+                <div class="phone-buttons">
+                    <button type="button" class="modal-btn-outline" id="phoneNotifBtn">Уведомления</button>
+                    <button type="button" class="modal-btn-outline" id="phoneBatteryBtn">Батарея: без ограничений</button>
+                </div>
+            </div>
             <div class="settings-group">
                 <div>
                     <label for="settingAutoConfirm" id="autoConfirmLabel">Автоматически подтверждать напоминания</label>
@@ -2699,6 +2760,7 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
                 selectAll: 'Выделить всё', deselect: 'Снять выделение', copy: 'Копировать', copyAll: 'Копировать всё', copySelection: 'Копировать выделенное', paste: 'Вставить', pasteDenied: 'Нет доступа к буферу — разрешите или нажмите Ctrl+V', pasteEmpty: 'В буфере нет текста',
                 phoneRemindDeadlines: 'Напоминания о дедлайнах', phoneRemindDeadlinesHint: 'Уведомление на телефоне за указанное число минут до срока (работает и при закрытом приложении)',
                 phoneRemindRepeats: 'Напоминания о повторах', phoneRemindRepeatsHint: 'Уведомление на телефоне за указанное число минут до слота повторяющейся задачи',
+                phoneSectionLabel: 'Разрешения Android', phoneSectionHint: 'напоминания приходят и при закрытом приложении; если пуш не пришёл — проверьте, что уведомления разрешены и батарея не ограничивает приложение', phoneNotifBtn: 'Уведомления', phoneBatteryBtn: 'Батарея: без ограничений',
                 taskInfo: 'Информация о задаче',
                 clearAll: 'Очистить всё', clearSelection: 'Стереть выделенное',
                 finish: 'Завершить',
@@ -2833,6 +2895,7 @@ hideFarTasksHint: 'Задачи с дедлайном дальше указан�
                 selectAll: 'Select all', deselect: 'Deselect', copy: 'Copy', copyAll: 'Copy all', copySelection: 'Copy selection', paste: 'Paste', pasteDenied: 'No clipboard access — allow it or press Ctrl+V', pasteEmpty: 'No text in the clipboard',
                 phoneRemindDeadlines: 'Deadline reminders', phoneRemindDeadlinesHint: 'Phone notification the set number of minutes before the due time (works with the app closed)',
                 phoneRemindRepeats: 'Repeat reminders', phoneRemindRepeatsHint: 'Phone notification the set number of minutes before a repeat slot',
+                phoneSectionLabel: 'Android permissions', phoneSectionHint: 'reminders arrive even when the app is closed; if a push did not arrive — check that notifications are allowed and the battery is not restricting the app', phoneNotifBtn: 'Notifications', phoneBatteryBtn: 'Battery: unrestricted',
                 taskInfo: 'Task info',
                 clearAll: 'Clear all', clearSelection: 'Delete selection',
                 finish: 'Finish',
@@ -3157,7 +3220,7 @@ theme: 'system',
         // нельзя — пропускаем; целиком видимую не трогаем; страницу короче
         // нужного клампим в пределы прокрутки; карточку выше полэкрана
         // ставим верхом у края (центрировать нечего)
-        function scrollTaskToMiddle(li) {
+        function scrollTaskToMiddle(li, instant) {
             if (!li.isConnected) return;
             if (li.classList.contains('search-hidden') || li.classList.contains('day-hidden')) return;
             if (li.offsetParent === null) return;
@@ -3173,7 +3236,14 @@ theme: 'system',
             ensureScrollRoom(Math.max(0, raw));
             const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh);
             const target = Math.max(0, Math.min(maxScroll, raw));
-            window.scrollTo({ top: target, behavior: 'smooth' });
+            // затяжной smooth-скролл в WebView не должен гасить свежую подсветку:
+            // окно благодати накрывает и его хвост (гвард в armTaskHighlight).
+            // instant — без анимации: по пути скролла updateTailSpace снимает
+            // распорку (критерий «не хуже текущей позиции» проходит при малом
+            // scrollY в начале анимации), страница укорачивается и Chrome
+            // клампит недоезжающий smooth-скролл — фокус из пуша промахивался
+            highlightScrollGrace = Date.now() + 1600;
+            window.scrollTo({ top: target, behavior: instant ? 'auto' : 'smooth' });
         }
 
         // подсветка новой задачи / нового дедлайна (appearing + highlight-hold)
@@ -3181,16 +3251,26 @@ theme: 'system',
         // колесо — затем гаснет за 2с. События САМОЙ программы не считаются:
         // автопрокрутка после добавления и восстановление позиции при выборе
         // дня отыгрывают в первые мгновения, поэтому scroll/wheel слушатели
-        // встают с задержкой 800мс (тап и клавиша в этот момент уже поймали бы
-        // pointerdown/keydown)
+        // встают с задержкой (тап и клавиша в этот момент уже поймали бы
+        // pointerdown/keydown). APK-фантомы, гасившие точку без действий
+        // пользователя: keydown 229/Unidentified от перезапуска композиции
+        // клавиатуры, хвост затяжной программной прокрутки (в WebView она
+        // длиннее 800мс) и скролл-клампы от ресайза окна — все три отфильтрованы
         const heldHighlights = new Set();
         let highlightFadeArmed = false;
+        let highlightScrollGrace = 0;   // до этого момента scroll не считается
+        let highlightLastResize = 0;    // ресайз клавиатуры — клампы скролла
+        window.addEventListener('resize', function() { highlightLastResize = Date.now(); }, true);
         function armTaskHighlight(li) {
             li.classList.add('highlight-hold');
             heldHighlights.add(li);
             if (highlightFadeArmed) return;
             highlightFadeArmed = true;
-            const fade = function() {
+            const fade = function(ev) {
+                if (ev && ev.type === 'keydown' &&
+                    (ev.isComposing || ev.keyCode === 229 || ev.key === 'Unidentified')) return;
+                if (ev && ev.type === 'scroll' &&
+                    (Date.now() < highlightScrollGrace || Date.now() - highlightLastResize < 400)) return;
                 highlightFadeArmed = false;
                 document.removeEventListener('pointerdown', fade, true);
                 document.removeEventListener('keydown', fade, true);
@@ -3209,7 +3289,7 @@ theme: 'system',
                 if (!highlightFadeArmed) return; // уже погасли по тапу/клавише
                 document.addEventListener('scroll', fade, true);
                 document.addEventListener('wheel', fade, true);
-            }, 800);
+            }, 1200);
         }
 
 
@@ -3471,29 +3551,40 @@ theme: 'system',
                     + parseFloat(cs.paddingTop) + parseFloat(cs.borderTopWidth);
             }
 
+            // Строка курсора ЦЕЛИКОМ в видимой зоне (visualViewport уже
+            // учитывает клавиатуру)? Прокрутка не нужна — правим там, куда
+            // тапнули. Прежние запасы 40/80 дёргали строку, видимую над
+            // клавиатурой; пользователь: «если клавиатура не перекрывает
+            // редактируемый текст — ничего не прокручивать»
+            function caretLineVisible() {
+                const vv = window.visualViewport;
+                if (!vv) return true; // нет данных о видимой зоне — не вмешиваемся
+                const cursorY = textarea.getBoundingClientRect().top + measureCaretY();
+                const lineH = parseFloat(getComputedStyle(textarea).lineHeight) || 20;
+                const rel = cursorY - vv.offsetTop;
+                return rel >= 0 && rel + lineH <= vv.height;
+            }
+
             function centerCursorOnScreen() {
+                if (caretLineVisible()) return;
                 const cursorOffsetInTextarea = measureCaretY();
                 const textareaRect = textarea.getBoundingClientRect();
                 const cursorYInLayoutViewport = textareaRect.top + cursorOffsetInTextarea;
                 const vv = window.visualViewport;
                 const viewportHeight = vv ? vv.height : window.innerHeight;
                 const viewportOffsetTop = vv ? vv.offsetTop : 0;
-                // Курсор уже в видимой зоне (с запасом на строку набора над
-                // клавиатурой) — центрировать не нужно: карточка была видна
-                // целиком, и рывок к центру только мешает
-                if (vv) {
-                    const topMargin = 40;
-                    const bottomMargin = 80;
-                    if (cursorYInLayoutViewport >= viewportOffsetTop + topMargin &&
-                        cursorYInLayoutViewport <= viewportOffsetTop + viewportHeight - bottomMargin) {
-                        return;
-                    }
-                }
                 const targetCursorY = viewportOffsetTop + viewportHeight / 2;
                 const scrollDelta = cursorYInLayoutViewport - targetCursorY;
                 const newScrollY = window.scrollY + scrollDelta;
                 window.scrollTo({ top: Math.max(0, newScrollY), behavior: 'instant' });
             }
+
+            // глобальная страховка ensureEditVisible работает СО СТРОКОЙ КУРСОРА,
+            // а не со всем элементом (у длинного раскрытого поля верх почти
+            // всегда выше экрана — центрирование всего поля уводило набранные
+            // строки за клавиатуру)
+            textarea._caretLineVisible = caretLineVisible;
+            textarea._centerCursor = centerCursorOnScreen;
 
             textarea.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
@@ -3640,6 +3731,11 @@ theme: 'system',
                 saveEdit();
             });
 
+            // правка меняет высоту карточки дважды (span -> textarea rows=1 ->
+            // autoResize): транзитное схлопывание клампит прокрутку, и позиция
+            // экрана терялась — тап по нижним строкам глубокой задачи прыгал
+            // к началу страницы. Фиксируем scrollY до замены и возвращаем
+            const scrollYAtEditStart = window.scrollY;
             span.replaceWith(textarea);
 
             counter = document.createElement('div');
@@ -3647,7 +3743,7 @@ theme: 'system',
             li.querySelector('.task-content').appendChild(counter);
             updateCharCounter(textarea, counter);
 
-            editToolbar = createEditToolbar(textarea, autoResize, saveEdit, cancelEdit);
+            editToolbar = createEditToolbar(textarea, autoResize, saveEdit, cancelEdit, originalText);
             const meta = li.querySelector('.task-meta');
             const metaLeft = meta.querySelector('.task-meta-left');
             const actions = meta.querySelector('.task-actions');
@@ -3672,8 +3768,8 @@ theme: 'system',
                 window.scrollTo(0, scrollYBeforeFocus);
             }
             autoResize();
-            if (window.scrollY !== scrollYBeforeFocus) {
-                window.scrollTo(0, scrollYBeforeFocus);
+            if (window.scrollY !== scrollYAtEditStart) {
+                window.scrollTo(0, scrollYAtEditStart);
             }
 
             if (initialCursorPos !== null) {
@@ -3914,7 +4010,7 @@ theme: 'system',
             return buttons;
         }
 
-        function createEditToolbar(textarea, autoResize, saveEdit, cancelEdit) {
+        function createEditToolbar(textarea, autoResize, saveEdit, cancelEdit, originalText) {
             const toolbar = document.createElement('div');
             toolbar.className = 'edit-toolbar';
 
@@ -3926,13 +4022,51 @@ theme: 'system',
 
             const [btnSelect, btnCopy, btnPaste, btnClear] = createTextToolButtons(textarea);
 
+            // Отмена при ИЗМЕНЁННОМ тексте — удержание 2с (случайный тап не
+            // теряет правку); заполнение подложки показывает остаток. Если
+            // текст не меняли — отмена мгновенно, как раньше
+            const CANCEL_HOLD_MS = 2000;
             const btnCancel = document.createElement('button');
-            btnCancel.className = 'edit-toolbar-btn text-btn';
-            btnCancel.textContent = t('cancel');
             btnCancel.type = 'button';
+            btnCancel.className = 'edit-toolbar-btn text-btn hold-capable';
+            const holdFill = document.createElement('span');
+            holdFill.className = 'hold-fill';
+            const cancelLabel = document.createElement('span');
+            cancelLabel.textContent = t('cancel');
+            btnCancel.appendChild(holdFill);
+            btnCancel.appendChild(cancelLabel);
+
+            let holdTimer = null;
+            let holdDone = false;
+            const startHold = () => {
+                if (textarea.value === originalText) return; // не меняли — обычный клик
+                holdDone = false;
+                btnCancel.classList.add('hold-active');
+                holdTimer = setTimeout(() => {
+                    holdTimer = null;
+                    holdDone = true;
+                    btnCancel.classList.remove('hold-active');
+                    cancelEdit();
+                }, CANCEL_HOLD_MS);
+            };
+            const abortHold = () => {
+                if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+                btnCancel.classList.remove('hold-active');
+            };
+            btnCancel.addEventListener('pointerdown', (e) => {
+                // БЕЗ preventDefault: совместимые mousedown должны дойти до
+                // li-гвapда — он держит фокус в поле (иначе blur -> saveEdit)
+                try { btnCancel.setPointerCapture(e.pointerId); } catch (err) {}
+                startHold();
+            });
+            btnCancel.addEventListener('pointerup', () => { if (!holdDone) abortHold(); });
+            btnCancel.addEventListener('pointercancel', abortHold);
+            btnCancel.addEventListener('contextmenu', (e) => e.preventDefault()); // долгий тап — без меню
             btnCancel.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                if (holdDone) { holdDone = false; return; } // клик после завершённого удержания
+                if (textarea.value !== originalText) return; // меняли — только удержание
                 cancelEdit();
             });
 
@@ -4226,6 +4360,10 @@ theme: 'system',
             document.getElementById('phoneRemindDeadlinesHint').textContent = t('phoneRemindDeadlinesHint');
             document.getElementById('phoneRemindRepeatsLabel').textContent = t('phoneRemindRepeats');
             document.getElementById('phoneRemindRepeatsHint').textContent = t('phoneRemindRepeatsHint');
+            document.getElementById('phoneSectionLabel').textContent = t('phoneSectionLabel');
+            document.getElementById('phoneSectionHint').textContent = t('phoneSectionHint');
+            document.getElementById('phoneNotifBtn').textContent = t('phoneNotifBtn');
+            document.getElementById('phoneBatteryBtn').textContent = t('phoneBatteryBtn');
         setIconLabel(document.getElementById('calRowsMinus'), t('calRowsLess'));
         document.getElementById('calFutureRepeats').setAttribute('aria-label', t('calFutureRepeats'));
         setIconLabel(document.getElementById('calRowsPlus'), t('calRowsMore'));
@@ -4459,6 +4597,14 @@ theme: 'system',
                 effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
             }
             document.documentElement.setAttribute('data-theme', effectiveTheme);
+            // обёртка APK запоминает тему и красит окно/статусбар до первой
+            // отрисовки страницы — без этого холодный старт светит белым даже
+            // в тёмной теме (в браузере моста нет — тихий выход)
+            try {
+                if (window.AppNative && typeof AppNative.setTheme === 'function') {
+                    AppNative.setTheme(effectiveTheme === 'dark' ? 'dark' : 'light');
+                }
+            } catch (e) {}
         }
 
         if (window.matchMedia) {
@@ -4682,6 +4828,17 @@ theme: 'system',
             updateBodyScroll();
             updateCollapseState();
             cloudInit();
+            // разрешения Android — только в обёртке APK (в браузере системных
+            // окон нет): кнопки настроек уведомлений и батарейного исключения
+            if (window.AppNative && typeof AppNative.openBatterySettings === 'function') {
+                document.getElementById('phoneSection').style.display = '';
+                document.getElementById('phoneNotifBtn').addEventListener('click', function() {
+                    try { AppNative.openNotificationSettings(); } catch (e) {}
+                });
+                document.getElementById('phoneBatteryBtn').addEventListener('click', function() {
+                    try { AppNative.openBatterySettings(); } catch (e) {}
+                });
+            }
         });
 
         function initStaticIcons() {
@@ -5380,7 +5537,7 @@ theme: 'system',
         function destroyColorPicker(picker) {
             if (!picker) return;
             const hostLi = picker._hostLi;
-            if (hostLi) hostLi.classList.remove('color-picker-active');
+            if (hostLi) hostLi.classList.remove('color-picker-active', 'picker-above');
             if (picker._blocker && picker._blocker.parentNode) {
                 picker._blocker.remove();
             }
@@ -5419,9 +5576,24 @@ theme: 'system',
 
             li.appendChild(picker);
 
-            // Позиция палитры: фиксированное место у верхней границы карточки
-            // (над текстом), не зависящее от точки клика
-            picker.style.top = '0px';
+            // Позиция палитры: полоса плашек НАД карточкой, вплотную к её
+            // верхней границе — текст задачи не перекрывается (просьба
+            // пользователя). Колонки клика меток — точно в границы карточки
+            // (CSS-переменные --col-top/--col-h), поэтому overflow:hidden
+            // в этом режиме не нужен. Карточка у самого верха экрана —
+            // прежнее поведение (плашки внутри карточки, поверх текста)
+            const stripH = picker.offsetHeight;
+            if (li.getBoundingClientRect().top >= stripH + 4) {
+                picker.style.top = (-stripH) + 'px';
+                li.classList.add('picker-above');
+                const dot0 = picker.querySelector('.color-dot');
+                picker.style.setProperty('--col-top', (stripH - dot0.offsetTop) + 'px');
+                picker.style.setProperty('--col-h', li.offsetHeight + 'px');
+            } else {
+                picker.style.top = '0px';
+                picker.style.setProperty('--col-top', '-300px');
+                picker.style.setProperty('--col-h', '700px');
+            }
 
             li.classList.add('color-picker-active');
 
@@ -9907,8 +10079,15 @@ theme: 'system',
                         }
                         slots.forEach(slot => {
                             const before = repeat ? beforeRepeat : beforeDeadline;
-                            const at = slot.getTime() - before;
-                            if (at <= now) return;
+                            let at = slot.getTime() - before;
+                            if (at <= now) {
+                                // окно «за N минут» уже прошло, а слот ещё впереди:
+                                // задачу создали незадолго до срока или напоминание
+                                // уехало за полночь (срок 00:30, «за 60 минут» = вчера
+                                // 23:30) — напоминать в момент слота, а не молчать
+                                at = slot.getTime();
+                                if (at <= now) return;
+                            }
                             // заголовок пуша: «В чч:мм - "текст задачи"»
                             const timeStr = slot.toLocaleTimeString(localeStr(), { hour: '2-digit', minute: '2-digit', hour12: false });
                             const prep = t('atPreposition');
@@ -9953,6 +10132,65 @@ theme: 'system',
             } catch (e) { return 'error: ' + (e && e.message); }
         };
 
+        // тап по ТЕЛУ пуш-уведомления (мост из обёртки APK): открыть приложение
+        // на задаче — если её прячут фильтры (поиск/метка/выбранный день), снять
+        // их, прокрутить карточку к середине экрана и зажечь красную точку
+        window.__nativeFocusTask = function(taskId) {
+            try {
+                if (!taskId) return 'no args';
+                const findLi = () => document.querySelector('#tasksBlocks li[data-id="' + taskId + '"]:not(.clone-task)');
+                const li = findLi();
+                if (!li || li.classList.contains('completed')) return 'no task';
+                if (li.classList.contains('search-hidden')) {
+                    // прячут: запрос в панели поиска и её цветовой фильтр, а
+                    // при закрытой панели — набор в поле новой задачи и метка
+                    searchInput.value = '';
+                    activeColorFilter = null;
+                    taskInput.value = '';
+                    inputLastText = '';
+                    typingColorFilter = false;
+                    autoResizeTextarea();
+                    updateAddButton();
+                    updateCharCounter(taskInput, document.getElementById('taskInputCounter'));
+                    syncPaletteSelection();
+                    updateFilterPalettes();
+                    applySearch();
+                }
+                if (li.classList.contains('day-hidden')) {
+                    if (taskInfoPopup) closeTaskInfoPopup();
+                    setCalendarFilter(null);
+                }
+                if (!li.offsetParent) return 'hidden';
+                // мгновенный скролл: плавный в начале анимации терял распорку
+                // (updateTailSpace) и клампился до задачи (см. scrollTaskToMiddle)
+                scrollTaskToMiddle(li, true);
+                armTaskHighlight(li);
+                // ХОЛОДНЫЙ СТАРТ: раскладка в момент onPageFinished могла быть
+                // не финальной (innerHeight/scrollHeight плыли), а позже списки
+                // могло пересобрать облаком (cloudApply -> loadTasks) — экран
+                // уезжал «куда угодно». Перепроверяем якорь пару раз: молча
+                // докручиваем к задаче, пока пользователь не тронул экран;
+                // после пересборки ищем карточку заново и зажигаем точку на ней
+                let userTouched = false;
+                const onUser = () => { userTouched = true; };
+                document.addEventListener('pointerdown', onUser, true);
+                setTimeout(() => document.removeEventListener('pointerdown', onUser, true), 2500);
+                const reanchor = () => {
+                    if (userTouched) return;
+                    const cur = findLi();
+                    if (!cur || cur.classList.contains('completed')) return;
+                    if (cur.classList.contains('search-hidden') || cur.classList.contains('day-hidden')) return;
+                    if (!cur.offsetParent) return;
+                    if (document.querySelector('.task-text-editing')) return;
+                    scrollTaskToMiddle(cur, true);
+                    armTaskHighlight(cur);
+                };
+                setTimeout(reanchor, 600);
+                setTimeout(reanchor, 1600);
+                return 'ok';
+            } catch (e) { return 'error: ' + (e && e.message); }
+        };
+
         // системная кнопка «Назад» (мост из обёртки APK): закрывает верхний
         // открытый слой интерфейса тем же путём, что его кнопки и Esc.
         // true — что-то закрыто (обёртка не выходит), false — нечего закрывать
@@ -9991,20 +10229,20 @@ theme: 'system',
         // ====================================================================
         //  Клавиатура на телефоне не должна закрывать редактируемый текст.
         //  В браузере прокрутку делает рендерер; в WebView (apk) окно может
-        //  не ресайзиться или ресайзиться без прокрутки — дублируем логику:
-        //  падение высоты окна (клавиатура открылась) и фокус на редакторе
-        //  -> редактор в середину видимой области, но ТОЛЬКО если он вне
-        //  экрана (собственная прокрутка браузера не дублируется: после неё
-        //  поле видно, и проверка проходит мимо)
+        //  не ресайзиться или ресайзиться без прокрутки — дублируем логику.
+        //  «Редактируемый текст» — СТРОКА С КУРСОРОМ, а не весь элемент: у
+        //  длинной раскрытой задачи верх поля почти всегда выше экрана, и
+        //  центрирование всего поля уводило набранные строки за клавиатуру
+        //  (жалоба: тап по нижним строкам раскрытой задачи прокручивал их
+        //  под клавиатуру). Строка курсора видима — ничего не прокручиваем;
+        //  скрыта — её в середину видимой области
         // ====================================================================
         let lastWindowH = window.innerHeight;
         function ensureEditVisible() {
             const ed = document.querySelector('.task-text-editing');
-            if (!ed) return;
-            const r = ed.getBoundingClientRect();
-            if (r.top < 0 || r.bottom > window.innerHeight) {
-                ed.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            if (!ed || typeof ed._caretLineVisible !== 'function') return;
+            if (ed._caretLineVisible()) return; // курсор виден — ничего не надо
+            ed._centerCursor();
         }
         window.addEventListener('resize', function() {
             const h = window.innerHeight;
@@ -10092,7 +10330,7 @@ theme: 'system',
         };
 
         const cloud = { ready: false, app: null, auth: null, authMod: null, db: null, fs: null, user: null, unsub: null, dirtyTimer: null, lastJson: null,
-            pendingFirstSnapshot: false, confirming: false, loginCancelled: false };
+            pendingFirstSnapshot: false, confirming: false, loginCancelled: false, firstSyncDone: false };
 
         function cloudConfigured() {
             return !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
@@ -10126,6 +10364,16 @@ theme: 'system',
         async function cloudPush() {
             cloud.dirtyTimer = null;
             if (!cloud.ready || !cloud.user || !cloud.fs) return;
+            // до первой загрузки облака отправлять НЕЛЬЗЯ: сохранения при старте
+            // страницы (автоподтверждение наступивших, чистки сроков хранения)
+            // вооружали таймер со СТАРЫМ локальным состоянием ещё до первого
+            // снапшота — такая отправка затирала свежие правки, сделанные на
+            // другом устройстве, пока страница грузилась. Откладываем до первой
+            // синхронизации (инцидент v1.9: правки из браузера потеряны)
+            if (!cloud.firstSyncDone) {
+                cloud.dirtyTimer = setTimeout(cloudPush, 2500);
+                return;
+            }
             try {
                 const state = cloudCollectState();
                 cloud.lastJson = JSON.stringify(state);
@@ -10166,11 +10414,19 @@ theme: 'system',
             if (cloud.unsub) cloud.unsub();
             const ref = cloud.fs.doc(cloud.db, 'taskStates', cloud.user.uid);
             cloud.unsub = cloud.fs.onSnapshot(ref, async (snap) => {
-                if (!snap.exists()) { cloudPush(); return; } // первый вход — выгружаем локальное
+                // первое событие подписки может прийти из ЛОКАЛЬНОГО кэша
+                // Firestore (persistentLocalCache) — он не доказывает, что мы
+                // видели сервер; ждём серверный снимок. Заодно пустой кэш
+                // (очищенный IndexedDB) больше не повод выгружать локальное
+                // поверх живого облака
+                if (snap.metadata && snap.metadata.fromCache) return;
+                if (!snap.exists()) { cloud.firstSyncDone = true; cloudPush(); return; } // первый вход — выгружаем локальное
                 const state = snap.data();
                 const json = JSON.stringify(state);
-                if (json === cloud.lastJson) return;   // эхо собственной записи
-                if (cloud.dirtyTimer) return;          // наши правки в полёте — наша версия победит
+                if (json === cloud.lastJson) { cloud.firstSyncDone = true; return; }   // эхо собственной записи
+                // наши правки в полёте — наша версия победит. Но только ПОСЛЕ
+                // первой синхронизации: до неё облако главнее (см. cloudPush)
+                if (cloud.dirtyTimer && cloud.firstSyncDone) return;
                 if (cloud.confirming) return;          // диалог первого входа уже открыт
                 if (cloud.pendingFirstSnapshot) {
                     // первый снапшот после входа по email или Google: флаг
@@ -10180,6 +10436,7 @@ theme: 'system',
                     if (hasUserData()) { await cloudConfirmFirstPull(state, json); return; }
                 }
                 cloud.lastJson = json;
+                cloud.firstSyncDone = true;
                 if (cloudApply(state)) cloudUpdateStatus(true);
             }, (err) => console.error('Ошибка подписки Firestore:', err));
         }
@@ -10198,6 +10455,7 @@ theme: 'system',
                 try { await cloud.authMod.signOut(cloud.auth); } catch (e) { cloud.loginCancelled = false; }
                 return;
             }
+            cloud.firstSyncDone = true; // серверное состояние увидели — дальнейшие правки можно отправлять
             if (cloud.dirtyTimer) return; // пока был открыт диалог, правили локально — их версия победит
             if (cloudApply(state)) cloudUpdateStatus(true);
         }
@@ -10353,7 +10611,10 @@ theme: 'system',
                 authMod.getRedirectResult(cloud.auth).catch(() => {});
                 authMod.onAuthStateChanged(cloud.auth, (user) => {
                     cloud.user = user;
-                    if (!user) cloudSetFirstPullFlag(false); // выход — флаг не должен дожить до следующего входа
+                    if (!user) {
+                        cloudSetFirstPullFlag(false); // выход — флаг не должен дожить до следующего входа
+                        cloud.firstSyncDone = false;  // следующий вход — новая первая синхронизация
+                    }
                     cloudSetAuthUi(!!user);
                     cloudUpdateStatus(false);
                     if (user) cloudSubscribe();
@@ -10365,11 +10626,14 @@ theme: 'system',
                     // пока ждём ответ на предупреждение первого входа — не применяем молча
                     if (cloud.pendingFirstSnapshot || cloud.confirming) return;
                     const ref = cloud.fs.doc(cloud.db, 'taskStates', cloud.user.uid);
-                    cloud.fs.getDoc(ref).then(snap => {
+                    // source:'server': офлайн getDoc вернул бы кэш — кэш не повод
+                    // перезаписывать локальное; серверный снапшот догонит onSnapshot
+                    cloud.fs.getDoc(ref, { source: 'server' }).then(snap => {
                         if (!snap.exists()) return;
                         const json = JSON.stringify(snap.data());
-                        if (json !== cloud.lastJson && !cloud.dirtyTimer) {
+                        if (json !== cloud.lastJson && (!cloud.dirtyTimer || !cloud.firstSyncDone)) {
                             cloud.lastJson = json;
+                            cloud.firstSyncDone = true;
                             if (cloudApply(snap.data())) cloudUpdateStatus(true);
                         }
                     }).catch(() => { /* офлайн — снапшот догонит */ });
