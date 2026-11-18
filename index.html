@@ -44,7 +44,7 @@
             --bg-calendar-today-text: #007bff;
             --bg-highlight-new: #cfe2ff;
             --bg-spinner-focus: #f0f7ff;
-            --bg-task-overlay: rgba(255, 255, 255, 0.88);
+            --bg-task-overlay: #f8f9fa;
             --scrollbar-track: rgba(0, 0, 0, 0.03);
             --scrollbar-thumb: rgba(0, 0, 0, 0.2);
             --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
@@ -121,7 +121,7 @@
             --bg-calendar-today-text: #4da3ff;
             --bg-highlight-new: #1e3a5f;
             --bg-spinner-focus: #1e3a5f;
-            --bg-task-overlay: rgba(45, 45, 45, 0.92);
+            --bg-task-overlay: #3a3a3a;
             --scrollbar-track: rgba(255, 255, 255, 0.03);
             --scrollbar-thumb: rgba(255, 255, 255, 0.2);
             --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
@@ -522,6 +522,8 @@
             left: 0;
             right: 0;
             bottom: 0;
+            /* непрозрачный фон в цвет карточки (просьба пользователя: под
+               уведомлением не должно просвечивать редактируемое поле) */
             background: var(--bg-task-overlay);
             display: flex;
             align-items: center;
@@ -532,11 +534,14 @@
             font-size: 13px;
             font-weight: 600;
             color: var(--text-primary);
-            backdrop-filter: blur(2px);
             animation: overlayIn 0.2s ease;
             pointer-events: auto;
         }
         @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+        /* оверлей отсчёта при активной ПРАВКЕ должен краситься поверх поля
+           редактирования (у .task-text-editing z-index 1002 > 10 — поле
+           закрывало уведомление отмены правки); вне правки z 10 достаточен */
+        li:has(.task-text-editing) .task-overlay { z-index: 1010; }
         .task-overlay .overlay-icon { font-size: 16px; }
         .task-overlay .overlay-message { flex-shrink: 1; min-width: 0; }
         .task-overlay .overlay-timer {
@@ -828,26 +833,6 @@
         /* рамка через box-shadow: раскладка кнопки не меняется при смене иконки */
         .edit-toolbar-btn.with-border {
             box-shadow: inset 0 0 0 1.5px currentColor;
-        }
-        /* удержание Отмены при изменённом тексте: подложка заполняется слева
-           направо за 2с (длительность синхронна с CANCEL_HOLD_MS в
-           createEditToolbar); отпускание раньше — быстрый обратный слив */
-        .edit-toolbar-btn { position: relative; }
-        .edit-toolbar-btn .hold-fill {
-            position: absolute;
-            inset: 0;
-            background: var(--text-danger);
-            opacity: 0.25;
-            transform: scaleX(0);
-            transform-origin: left center;
-            pointer-events: none;
-            transition: transform 0.25s ease;
-        }
-        .edit-toolbar-btn.hold-active .hold-fill { transform: scaleX(1); transition: transform 2s linear; }
-        .edit-toolbar-btn.hold-capable {
-            touch-action: none; /* палец не уводится в скролл посреди удержания */
-            user-select: none;
-            -webkit-user-select: none;
         }
         .edit-overlay {
             position: fixed;
@@ -2761,6 +2746,7 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
                 phoneRemindDeadlines: 'Напоминания о дедлайнах', phoneRemindDeadlinesHint: 'Уведомление на телефоне за указанное число минут до срока (работает и при закрытом приложении)',
                 phoneRemindRepeats: 'Напоминания о повторах', phoneRemindRepeatsHint: 'Уведомление на телефоне за указанное число минут до слота повторяющейся задачи',
                 phoneSectionLabel: 'Разрешения Android', phoneSectionHint: 'напоминания приходят и при закрытом приложении; если пуш не пришёл — проверьте, что уведомления разрешены и батарея не ограничивает приложение', phoneNotifBtn: 'Уведомления', phoneBatteryBtn: 'Батарея: без ограничений',
+                cancelEditWarn: 'Изменения удалятся через:',
                 taskInfo: 'Информация о задаче',
                 clearAll: 'Очистить всё', clearSelection: 'Стереть выделенное',
                 finish: 'Завершить',
@@ -2896,6 +2882,7 @@ hideFarTasksHint: 'Задачи с дедлайном дальше указан�
                 phoneRemindDeadlines: 'Deadline reminders', phoneRemindDeadlinesHint: 'Phone notification the set number of minutes before the due time (works with the app closed)',
                 phoneRemindRepeats: 'Repeat reminders', phoneRemindRepeatsHint: 'Phone notification the set number of minutes before a repeat slot',
                 phoneSectionLabel: 'Android permissions', phoneSectionHint: 'reminders arrive even when the app is closed; if a push did not arrive — check that notifications are allowed and the battery is not restricting the app', phoneNotifBtn: 'Notifications', phoneBatteryBtn: 'Battery: unrestricted',
+                cancelEditWarn: 'Changes will be deleted in:',
                 taskInfo: 'Task info',
                 clearAll: 'Clear all', clearSelection: 'Delete selection',
                 finish: 'Finish',
@@ -4022,52 +4009,21 @@ theme: 'system',
 
             const [btnSelect, btnCopy, btnPaste, btnClear] = createTextToolButtons(textarea);
 
-            // Отмена при ИЗМЕНЁННОМ тексте — удержание 2с (случайный тап не
-            // теряет правку); заполнение подложки показывает остаток. Если
-            // текст не меняли — отмена мгновенно, как раньше
-            const CANCEL_HOLD_MS = 2000;
+            // Отмена при изменённом тексте — подтверждение поверх карточки
+            // (как при удалении: scheduleMove с отсчётом и кнопкой отмены;
+            // жалоба: удержание кнопки под пальцем не видно). Если текст не
+            // меняли — мгновенная отмена, как раньше
             const btnCancel = document.createElement('button');
+            btnCancel.className = 'edit-toolbar-btn text-btn';
+            btnCancel.textContent = t('cancel');
             btnCancel.type = 'button';
-            btnCancel.className = 'edit-toolbar-btn text-btn hold-capable';
-            const holdFill = document.createElement('span');
-            holdFill.className = 'hold-fill';
-            const cancelLabel = document.createElement('span');
-            cancelLabel.textContent = t('cancel');
-            btnCancel.appendChild(holdFill);
-            btnCancel.appendChild(cancelLabel);
-
-            let holdTimer = null;
-            let holdDone = false;
-            const startHold = () => {
-                if (textarea.value === originalText) return; // не меняли — обычный клик
-                holdDone = false;
-                btnCancel.classList.add('hold-active');
-                holdTimer = setTimeout(() => {
-                    holdTimer = null;
-                    holdDone = true;
-                    btnCancel.classList.remove('hold-active');
-                    cancelEdit();
-                }, CANCEL_HOLD_MS);
-            };
-            const abortHold = () => {
-                if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-                btnCancel.classList.remove('hold-active');
-            };
-            btnCancel.addEventListener('pointerdown', (e) => {
-                // БЕЗ preventDefault: совместимые mousedown должны дойти до
-                // li-гвapда — он держит фокус в поле (иначе blur -> saveEdit)
-                try { btnCancel.setPointerCapture(e.pointerId); } catch (err) {}
-                startHold();
-            });
-            btnCancel.addEventListener('pointerup', () => { if (!holdDone) abortHold(); });
-            btnCancel.addEventListener('pointercancel', abortHold);
-            btnCancel.addEventListener('contextmenu', (e) => e.preventDefault()); // долгий тап — без меню
             btnCancel.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (holdDone) { holdDone = false; return; } // клик после завершённого удержания
-                if (textarea.value !== originalText) return; // меняли — только удержание
-                cancelEdit();
+                const li = btnCancel.closest('li');
+                if (!li) return;
+                if (textarea.value === originalText) { cancelEdit(); return; }
+                scheduleMove(li, '✕', t('cancelEditWarn'), () => cancelEdit());
             });
 
             const btnFinish = document.createElement('button');
