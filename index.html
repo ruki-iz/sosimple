@@ -2801,6 +2801,8 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
                 syncErrNoUser: 'Аккаунт с таким email не найден',
                 syncOverwriteWarning: 'На сервере этого аккаунта уже есть данные. Локальные задачи и настройки будут заменены данными с сервера.',
                 syncLoginCancelled: 'Вход отменён — локальные данные сохранены',
+                syncUnsyncedWarn: 'На устройстве есть правки, которые не успели отправиться в облако (последняя — в {{time}}). «OK» — отправить их в облако (заменит данные облака), «Отмена» — загрузить данные из облака (эти правки пропадут).',
+                syncConnError: 'Ошибка связи с облаком — переподключение...',
                 syncShowPassword: 'Показать пароль', syncHidePassword: 'Скрыть пароль',
                 restoreToActive: 'В активные задачи', restoreToCompleted: 'В выполненные задачи', deleteForever: 'Удалить навсегда',
                 moveToCompleted: 'Перемещение в «Выполненные»', moveToActive: 'Возврат в активные задачи',
@@ -2937,6 +2939,8 @@ hideFarTasksHint: 'Задачи с дедлайном дальше указан�
                 syncErrNoUser: 'No account with this email',
                 syncOverwriteWarning: 'This account already has data on the server. Your local tasks and settings will be replaced with the server data.',
                 syncLoginCancelled: 'Sign-in cancelled — local data kept',
+                syncUnsyncedWarn: 'This device has changes that were not sent to the cloud (last one at {{time}}). "OK" sends them to the cloud (replaces cloud data), "Cancel" loads data from the cloud (these changes will be lost).',
+                syncConnError: 'Cloud connection error — reconnecting...',
                 syncShowPassword: 'Show password', syncHidePassword: 'Hide password',
                 restoreToActive: 'To active tasks', restoreToCompleted: 'To completed tasks', deleteForever: 'Delete forever',
                 moveToCompleted: 'Moving to "Completed"', moveToActive: 'Returning to active tasks',
@@ -4649,6 +4653,9 @@ theme: 'system',
                     localStorage.setItem('myTasks', JSON.stringify(data.tasks));
                     localStorage.setItem('trashTasks', JSON.stringify(data.trash));
                     localStorage.setItem('appSettings', JSON.stringify(data.settings));
+                    // импорт — та же несинхронизированная правка: если процесс
+                    // умрёт до отправки, следующий запуск предложит выбор
+                    try { localStorage.setItem('cloudUnsynced', String(Date.now())); } catch (e) {}
                     // выгружаем импортированное в облако до перезагрузки
                     cloudPush();
                     setTimeout(() => location.reload(), 800);
@@ -4675,6 +4682,9 @@ theme: 'system',
                 pendingDeadline = null;
                 updatePendingDeadlineButton();
                 stopTitleBlinking();
+                // очистка — та же несинхронизированная правка: без метки при
+                // гибели до отправки следующий запуск молча вернул бы данные
+                try { localStorage.setItem('cloudUnsynced', String(Date.now())); } catch (e) {}
                 // выгружаем очищенное состояние в облако, иначе снапшот вернёт всё обратно
                 cloudPush();
                 setTimeout(() => location.reload(), 800);
@@ -9909,6 +9919,20 @@ theme: 'system',
         // каждые 5 с — дедлайны и заголовок вкладки
         function backgroundTick() {
             try {
+                // догоняющее применение снапшота, удержанного правкой/отсчётом
+                // (cloudApply вернул false): как только они ушли — применяем,
+                // иначе изменение осталось бы «неувиденным» до чужой следующей
+                // правки. Повторная правка сбрасывает deferred (cloudMarkDirty)
+                if (cloud.deferredState && !cloud.confirming && !cloud.pendingFirstSnapshot
+                    && cloud.deferredJson !== cloud.lastJson) {
+                    const st = cloud.deferredState, js = cloud.deferredJson;
+                    if (cloudApply(st)) {
+                        cloud.deferredState = null;
+                        cloud.deferredJson = null;
+                        cloud.lastJson = js;
+                        cloudUpdateStatus(true);
+                    }
+                }
                 refreshDeadlineTexts();
                 // статусы (просрочено/наступило) пересчитываются здесь же;
                 // переход должен САМ включать пульс точек календаря и классы
@@ -10071,20 +10095,43 @@ theme: 'system',
         // переносили в приложении) игнорируются по несовпадению слота —
         // сравниваем МОМЕНТ времени, а не строки: обёртка присылает ISO из
         // расписания, dataset.deadline мог быть записан в другом формате
+        function runNativeConfirm(taskId, slotTs) {
+            const li = document.querySelector('#tasksBlocks li[data-id="' + taskId + '"]:not(.clone-task)');
+            if (!li || li.classList.contains('completed')) return 'no task';
+            const chip = li.querySelector('.deadline-display');
+            if (!chip || !li.dataset.repeat) return 'stale';
+            const slot = new Date(slotTs);
+            if (isNaN(slot.getTime()) ||
+                new Date(chip.dataset.deadline).getTime() !== slot.getTime()) return 'stale';
+            handleReminderOk(li, true);
+            const done = 'ok: перенесено на ' + (li.querySelector('.deadline-display')?.dataset.deadline || '?');
+            console.log('nativeConfirm', done);
+            return done;
+        }
         window.__nativeConfirmTask = function(taskId, slotTs) {
             try {
                 if (!taskId || !slotTs) return 'no args';
-                const li = document.querySelector('#tasksBlocks li[data-id="' + taskId + '"]:not(.clone-task)');
-                if (!li || li.classList.contains('completed')) return 'no task';
-                const chip = li.querySelector('.deadline-display');
-                if (!chip || !li.dataset.repeat) return 'stale';
-                const slot = new Date(slotTs);
-                if (isNaN(slot.getTime()) ||
-                    new Date(chip.dataset.deadline).getTime() !== slot.getTime()) return 'stale';
-                handleReminderOk(li, true);
-                const done = 'ok: перенесено на ' + (li.querySelector('.deadline-display')?.dataset.deadline || '?');
-                console.log('nativeConfirm', done);
-                return done;
+                // до первой синхронизации подтверждать НЕЛЬЗЯ: первый снапшот
+                // применит состояние облака и затрёт подтверждение (тап
+                // «Подтвердить» в пуше при убитом процессе: страница только
+                // загрузилась, слот переносится локально — и тут же
+                // откатывается «облако главнее»). Ждём первый серверный
+                // снапшот; офлайн — 4с fallback с меткой несинхронизированных
+                if (!cloud.firstSyncDone) {
+                    cloud.pendingNativeConfirm = { taskId: String(taskId), slotTs: String(slotTs) };
+                    if (!cloud.pendingConfirmFallback) {
+                        cloud.pendingConfirmFallback = setTimeout(function() {
+                            cloud.pendingConfirmFallback = null;
+                            const p = cloud.pendingNativeConfirm;
+                            cloud.pendingNativeConfirm = null;
+                            if (!p) return;
+                            try { localStorage.setItem('cloudUnsynced', String(Date.now())); } catch (e) {}
+                            try { runNativeConfirm(p.taskId, p.slotTs); } catch (e) {}
+                        }, 4000);
+                    }
+                    return 'deferred';
+                }
+                return runNativeConfirm(String(taskId), String(slotTs));
             } catch (e) { return 'error: ' + (e && e.message); }
         };
 
@@ -10286,7 +10333,14 @@ theme: 'system',
         };
 
         const cloud = { ready: false, app: null, auth: null, authMod: null, db: null, fs: null, user: null, unsub: null, dirtyTimer: null, lastJson: null,
-            pendingFirstSnapshot: false, confirming: false, loginCancelled: false, firstSyncDone: false };
+            pendingFirstSnapshot: false, confirming: false, loginCancelled: false, firstSyncDone: false,
+            // v1.9.15: applying — идёт cloudApply (внутри loadTasks возможен
+            // saveTasks, он не должен ставить метку несинхронизированных);
+            // deferredState — снапшот, удержанный правкой/отсчётом (догоняем
+            // в backgroundTick); pendingNativeConfirm — подтверждение слота
+            // из пуша, ждущее первой синхронизации
+            applying: false, deferredState: null, deferredJson: null,
+            pendingNativeConfirm: null, pendingConfirmFallback: null };
 
         function cloudConfigured() {
             return !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
@@ -10310,15 +10364,64 @@ theme: 'system',
             };
         }
 
+        // сравнение состояний без порядка ключей и updatedAt (обновляется при
+        // каждой отправке): «локальное отличается от облачного» для метки
+        // несинхронизированных правок
+        function cloudStableCore(state) {
+            const stable = (v) => {
+                if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+                if (v && typeof v === 'object') {
+                    return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+                }
+                return JSON.stringify(v);
+            };
+            return stable({ tasks: state.tasks || [], trash: state.trash || [], settings: state.settings || {} });
+        }
+
+        // первая серверная синхронизация сеанса состоялась: с неё разрешена
+        // отправка (cloudPush до неё откладывается) и правки получают защиту
+        // меткой cloudUnsynced
+        function cloudSetFirstSyncDone() {
+            if (cloud.firstSyncDone) return;
+            cloud.firstSyncDone = true;
+        }
+
+        // отложенное подтверждение слота из пуша: обёртка доставила кнопку,
+        // пока страница ещё не видела сервер — применяем ПОСЛЕ первого
+        // снапшота (иначе первый снапшот откатил бы подтверждение: тап по
+        // кнопке пула при убитом процессе открывал приложение, переносил
+        // слот — и тут же возвращал «наступило»)
+        function flushNativeConfirm() {
+            if (!cloud.pendingNativeConfirm) return;
+            const p = cloud.pendingNativeConfirm;
+            cloud.pendingNativeConfirm = null;
+            if (cloud.pendingConfirmFallback) { clearTimeout(cloud.pendingConfirmFallback); cloud.pendingConfirmFallback = null; }
+            try { runNativeConfirm(p.taskId, p.slotTs); } catch (e) {}
+        }
+
         // локальные изменения — в облако с задержкой (после серии правок)
         function cloudMarkDirty() {
             if (!cloud.ready || !cloud.user) return;
+            // метка несинхронизированных правок — только для «живых» правок
+            // (после первой синхронизации и вне cloudApply: применение снапшота
+            // и стартовые чистки сами по себе ничего не теряют). Если процесс
+            // умрёт до отправки, по метке следующий запуск предложит выбор
+            // вместо молчаливой потери
+            if (cloud.firstSyncDone && !cloud.applying) {
+                try { localStorage.setItem('cloudUnsynced', String(Date.now())); } catch (e) {}
+            }
+            // отложенное с сервера больше не актуально: наша правка победит
+            // при отправке (кто последний записал)
+            cloud.deferredState = null;
+            cloud.deferredJson = null;
             if (cloud.dirtyTimer) clearTimeout(cloud.dirtyTimer);
             cloud.dirtyTimer = setTimeout(cloudPush, 2500);
         }
 
         async function cloudPush() {
             cloud.dirtyTimer = null;
+            cloud.deferredState = null;
+            cloud.deferredJson = null;
             if (!cloud.ready || !cloud.user || !cloud.fs) return;
             // до первой загрузки облака отправлять НЕЛЬЗЯ: сохранения при старте
             // страницы (автоподтверждение наступивших, чистки сроков хранения)
@@ -10334,36 +10437,55 @@ theme: 'system',
                 const state = cloudCollectState();
                 cloud.lastJson = JSON.stringify(state);
                 await cloud.fs.setDoc(cloud.fs.doc(cloud.db, 'taskStates', cloud.user.uid), state);
+                // отправка состоялась — метка несинхронизированных правок снята
+                try { localStorage.removeItem('cloudUnsynced'); } catch (e) {}
                 cloudUpdateStatus(false);
             } catch (e) {
                 console.error('Ошибка отправки в Firebase:', e);
+                // отправка не состоялась — метка должна остаться, иначе
+                // следующий запуск молча затрёт эти правки облаком
+                if (cloud.firstSyncDone) {
+                    try { localStorage.setItem('cloudUnsynced', String(Date.now())); } catch (e2) {}
+                }
             }
         }
 
-        // применить пришедшее состояние к DOM (без перезагрузки страницы)
+        // применить пришедшее состояние к DOM (без перезагрузки страницы).
+        // false — применение удержано (открытая правка или отсчёт): вызывающий
+        // сохраняет снапшот в cloud.deferredState для догоняющего применения
+        // и НЕ обновляет lastJson — иначе эхо-проверка посчитала бы изменение
+        // увиденным, и оно никогда не применилось бы
         function cloudApply(state) {
-            // правка или отсчёт в полёте — пропускаем, следующий снапшот догонит
+            // правка или отсчёт в полёте — пропускаем, догоним позже
             if (document.querySelector('.task-text-editing') || document.querySelector('li.pending-move')) return false;
-            localStorage.setItem('myTasks', JSON.stringify(state.tasks || []));
-            localStorage.setItem('trashTasks', JSON.stringify(state.trash || []));
-            // тема оформления и напоминания хранятся локально: пришедшее
-            // из облака их не переносит
-            const localSettings = JSON.parse(localStorage.getItem('appSettings') || '{}');
-            const incomingSettings = state.settings || {};
-            if (typeof localSettings.theme === 'string') incomingSettings.theme = localSettings.theme;
-            ['phoneRemindDeadlines', 'phoneRemindDeadlinesMin', 'phoneRemindRepeats', 'phoneRemindRepeatsMin'].forEach(k => {
-                if (localSettings[k] !== undefined) incomingSettings[k] = localSettings[k];
-            });
-            localStorage.setItem('appSettings', JSON.stringify(incomingSettings));
-            loadSettings();
-            applyTheme();
-            applyTaskFontSize();
-            loadTasks();
-            loadTrash();
-            applyLanguage();
-            checkDeadlineAlerts();
-            updateTailSpace();
-            return true;
+            cloud.applying = true;
+            try {
+                localStorage.setItem('myTasks', JSON.stringify(state.tasks || []));
+                localStorage.setItem('trashTasks', JSON.stringify(state.trash || []));
+                // тема оформления и напоминания хранятся локально: пришедшее
+                // из облака их не переносит
+                const localSettings = JSON.parse(localStorage.getItem('appSettings') || '{}');
+                const incomingSettings = state.settings || {};
+                if (typeof localSettings.theme === 'string') incomingSettings.theme = localSettings.theme;
+                ['phoneRemindDeadlines', 'phoneRemindDeadlinesMin', 'phoneRemindRepeats', 'phoneRemindRepeatsMin'].forEach(k => {
+                    if (localSettings[k] !== undefined) incomingSettings[k] = localSettings[k];
+                });
+                localStorage.setItem('appSettings', JSON.stringify(incomingSettings));
+                loadSettings();
+                applyTheme();
+                applyTaskFontSize();
+                loadTasks();
+                loadTrash();
+                applyLanguage();
+                checkDeadlineAlerts();
+                updateTailSpace();
+                return true;
+            } finally {
+                // внутри loadTasks возможен saveTasks (назначение id старым
+                // задачам) — это применение облачного состояния, а не локальная
+                // правка: метку несинхронизированного не ставим
+                cloud.applying = false;
+            }
         }
 
         function cloudSubscribe() {
@@ -10376,14 +10498,14 @@ theme: 'system',
                 // (очищенный IndexedDB) больше не повод выгружать локальное
                 // поверх живого облака
                 if (snap.metadata && snap.metadata.fromCache) return;
-                if (!snap.exists()) { cloud.firstSyncDone = true; cloudPush(); return; } // первый вход — выгружаем локальное
+                if (!snap.exists()) { cloudSetFirstSyncDone(); flushNativeConfirm(); cloudPush(); return; } // первый вход — выгружаем локальное
                 const state = snap.data();
                 const json = JSON.stringify(state);
-                if (json === cloud.lastJson) { cloud.firstSyncDone = true; return; }   // эхо собственной записи
+                if (json === cloud.lastJson) { cloudSetFirstSyncDone(); flushNativeConfirm(); return; }   // эхо собственной записи
                 // наши правки в полёте — наша версия победит. Но только ПОСЛЕ
                 // первой синхронизации: до неё облако главнее (см. cloudPush)
                 if (cloud.dirtyTimer && cloud.firstSyncDone) return;
-                if (cloud.confirming) return;          // диалог первого входа уже открыт
+                if (cloud.confirming) return;          // диалог уже открыт
                 if (cloud.pendingFirstSnapshot) {
                     // первый снапшот после входа по email или Google: флаг
                     // расходуется всегда, предупреждение — только когда есть
@@ -10391,10 +10513,54 @@ theme: 'system',
                     cloudSetFirstPullFlag(false);
                     if (hasUserData()) { await cloudConfirmFirstPull(state, json); return; }
                 }
-                cloud.lastJson = json;
-                cloud.firstSyncDone = true;
-                if (cloudApply(state)) cloudUpdateStatus(true);
-            }, (err) => console.error('Ошибка подписки Firestore:', err));
+                // метка несинхронизированных правок прошлого сеанса: процесс
+                // мог умереть до отправки (2.5с дебаунс не дожил до
+                // заморозки/убийства). Молча затирать локальное нельзя — это
+                // и есть «подтвердил на телефоне, через время слот снова
+                // просрочен»; сравниваем содержимое без updatedAt и порядка
+                // ключей
+                let unsyncedAt = 0;
+                try { unsyncedAt = Number(localStorage.getItem('cloudUnsynced') || 0); } catch (e) {}
+                if (unsyncedAt > 0) {
+                    if (cloudStableCore(state) === cloudStableCore(cloudCollectState())) {
+                        try { localStorage.removeItem('cloudUnsynced'); } catch (e) {} // уже на сервере
+                    } else {
+                        cloud.confirming = true;
+                        const time = new Date(unsyncedAt).toLocaleTimeString(localeStr(), { hour: '2-digit', minute: '2-digit', hour12: false });
+                        const ok = await showConfirm(t('syncUnsyncedWarn').replace('{{time}}', time), 'primary');
+                        cloud.confirming = false;
+                        if (ok) {
+                            cloudSetFirstSyncDone();
+                            flushNativeConfirm();
+                            cloudPush(); // локальное поверх облака — осознанный выбор
+                        } else {
+                            if (cloud.dirtyTimer) { clearTimeout(cloud.dirtyTimer); cloud.dirtyTimer = null; }
+                            cloud.lastJson = json;
+                            cloudSetFirstSyncDone();
+                            if (cloudApply(state)) cloudUpdateStatus(true);
+                            flushNativeConfirm();
+                            // выбор сделан — метка больше не нужна
+                            try { localStorage.removeItem('cloudUnsynced'); } catch (e) {}
+                        }
+                        return;
+                    }
+                }
+                cloudSetFirstSyncDone();
+                // lastJson — только при УСПЕШНОМ применении: если правка/отсчёт
+                // удержали снапшот (cloudApply вернул false), изменение должно
+                // остаться «неувиденным» — иначе эхо-проверка и getDoc при
+                // возврате на вкладку посчитали бы его доставленным, и оно
+                // никогда не применилось бы (догонит backgroundTick)
+                if (cloudApply(state)) { cloud.lastJson = json; cloudUpdateStatus(true); }
+                else { cloud.deferredState = state; cloud.deferredJson = json; }
+                flushNativeConfirm();
+            }, (err) => {
+                console.error('Ошибка подписки Firestore:', err);
+                // мёртвый канал live-обновлений показываем в статусе: иначе
+                // «что не сделай на смартфоне, в браузере не увидишь», а без
+                // строки статуса непонятно, что связь отвалилась
+                cloudShowConnError();
+            });
         }
 
         // вход в аккаунт, у которого на сервере уже есть данные, а локально
@@ -10411,9 +10577,10 @@ theme: 'system',
                 try { await cloud.authMod.signOut(cloud.auth); } catch (e) { cloud.loginCancelled = false; }
                 return;
             }
-            cloud.firstSyncDone = true; // серверное состояние увидели — дальнейшие правки можно отправлять
-            if (cloud.dirtyTimer) return; // пока был открыт диалог, правили локально — их версия победит
+            cloudSetFirstSyncDone(); // серверное состояние увидели — дальнейшие правки можно отправлять
+            if (cloud.dirtyTimer) { flushNativeConfirm(); return; } // пока был открыт диалог, правили локально — их версия победит
             if (cloudApply(state)) cloudUpdateStatus(true);
+            flushNativeConfirm();
         }
 
         // флаг предупреждения первого снапшота живёт и в sessionStorage:
@@ -10437,6 +10604,15 @@ theme: 'system',
             const st = document.getElementById('syncStatus');
             if (st) { st.textContent = msg; st.style.color = 'var(--text-danger)'; }
             console.error('Firebase auth:', code, e);
+        }
+
+        // мёртвый канал live-обновлений: показать в статусе синхронизации
+        // (обычный статус вернёт следующая успешная отправка/применение)
+        function cloudShowConnError() {
+            const st = document.getElementById('syncStatus');
+            if (!st || !cloud.ready) return;
+            st.textContent = t('syncConnError');
+            st.style.color = 'var(--text-danger)';
         }
 
         function cloudUpdateStatus(pulled) {
@@ -10570,15 +10746,24 @@ theme: 'system',
                     if (!user) {
                         cloudSetFirstPullFlag(false); // выход — флаг не должен дожить до следующего входа
                         cloud.firstSyncDone = false;  // следующий вход — новая первая синхронизация
+                        try { localStorage.removeItem('cloudUnsynced'); } catch (e) {} // метка правок прошлого сеанса
+                        cloud.deferredState = null; cloud.deferredJson = null;
+                        cloud.pendingNativeConfirm = null;
+                        if (cloud.pendingConfirmFallback) { clearTimeout(cloud.pendingConfirmFallback); cloud.pendingConfirmFallback = null; }
                     }
                     cloudSetAuthUi(!!user);
                     cloudUpdateStatus(false);
                     if (user) cloudSubscribe();
                     else if (cloud.unsub) { cloud.unsub(); cloud.unsub = null; }
                 });
-                // вернулись на вкладку — подтянуть свежий документ напрямую
+                // уход со страницы (сворачивание обёртки, смена вкладки/окна):
+                // отправляем немедленно — 2.5с дебаунс может не дожить до
+                // заморозки/убийства процесса, и правка останется только
+                // локально («подтвердил на телефоне — в браузере не появилось»)
+                const flushDirtyNow = () => { if (cloud.dirtyTimer) cloudPush(); };
                 document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState !== 'visible' || !cloud.user) return;
+                    if (document.visibilityState === 'hidden') { flushDirtyNow(); return; }
+                    if (!cloud.user) return;
                     // пока ждём ответ на предупреждение первого входа — не применяем молча
                     if (cloud.pendingFirstSnapshot || cloud.confirming) return;
                     const ref = cloud.fs.doc(cloud.db, 'taskStates', cloud.user.uid);
@@ -10588,12 +10773,18 @@ theme: 'system',
                         if (!snap.exists()) return;
                         const json = JSON.stringify(snap.data());
                         if (json !== cloud.lastJson && (!cloud.dirtyTimer || !cloud.firstSyncDone)) {
-                            cloud.lastJson = json;
-                            cloud.firstSyncDone = true;
-                            if (cloudApply(snap.data())) cloudUpdateStatus(true);
+                            cloudSetFirstSyncDone();
+                            // lastJson — только при успешном применении (см.
+                            // cloudSubscribe): удержанное правкой изменение
+                            // должно остаться «неувиденным»
+                            if (cloudApply(snap.data())) { cloud.lastJson = json; cloudUpdateStatus(true); }
+                            else { cloud.deferredState = snap.data(); cloud.deferredJson = json; }
+                            flushNativeConfirm();
                         }
                     }).catch(() => { /* офлайн — снапшот догонит */ });
                 });
+                // уничтожение страницы (обновление APK, закрытие вкладки)
+                window.addEventListener('pagehide', flushDirtyNow);
             } catch (e) {
                 console.error('Не удалось инициализировать Firebase:', e);
             }
