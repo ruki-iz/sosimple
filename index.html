@@ -10450,6 +10450,60 @@ theme: 'system',
             }
         }
 
+        // document-позиция верха элемента: сумма offsetTop по цепочке
+        // offsetParent. НЕ getBoundingClientRect — rect зависит от
+        // transform, а карточка-якорь может оказаться под движущейся
+        // анимацией (appearing/removing при недавнем локальном действии)
+        function cloudDocTop(li) {
+            let y = 0, el = li;
+            while (el) { y += el.offsetTop; el = el.offsetParent; }
+            return y;
+        }
+
+        // точка просмотра перед пересборкой DOM (cloudApply → loadTasks):
+        // карточка, ближайшая к верху вьюпорта, из любого из трёх блоков
+        // (включая клоны в закреплённых). По ней страница возвращается на
+        // место: пересборка схлопывает документ, прокрутка клампится — без
+        // якоря каждое применение облачного состояния прокручивало страницу
+        // вниз или вверх
+        function cloudViewAnchor() {
+            if (!window.scrollY) return null;
+            let best = null, bestDelta = Infinity;
+            document.querySelectorAll('#tasksBlocks li').forEach(li => {
+                const r = li.getBoundingClientRect();
+                if (r.bottom <= 0 || r.top >= window.innerHeight) return;
+                const delta = Math.abs(r.top);
+                if (delta < bestDelta) { bestDelta = delta; best = li; }
+            });
+            if (!best || !best.dataset.id) return null;
+            return {
+                id: best.dataset.id,
+                pinned: !!best.closest('#pinnedList'),
+                docTop: cloudDocTop(best),
+                y: window.scrollY
+            };
+        }
+
+        // вернуть просмотр на место после пересборки: карточка-якорь занимает
+        // прежнюю позицию на экране — контент, добавленный выше (правка с
+        // другого устройства), не сдвигает то, что пользователь читает; якорь
+        // удалён/скрыт — просто прежний scrollY (клампится по новой высоте)
+        function cloudRestoreView(a) {
+            if (!a) return;
+            let li = null;
+            if (a.id) {
+                li = a.pinned
+                    ? document.querySelector('#pinnedList li[data-id="' + a.id + '"]')
+                    : document.querySelector('#tasksBlocks li[data-id="' + a.id + '"]:not(.clone-task)');
+            }
+            if (li && li.offsetParent) {
+                const target = Math.max(0, a.y + (cloudDocTop(li) - a.docTop));
+                if (Math.abs(window.scrollY - target) >= 1) window.scrollTo(0, target);
+            } else if (a.y) {
+                window.scrollTo(0, a.y);
+            }
+        }
+
         // применить пришедшее состояние к DOM (без перезагрузки страницы).
         // false — применение удержано (открытая правка или отсчёт): вызывающий
         // сохраняет снапшот в cloud.deferredState для догоняющего применения
@@ -10458,6 +10512,7 @@ theme: 'system',
         function cloudApply(state) {
             // правка или отсчёт в полёте — пропускаем, догоним позже
             if (document.querySelector('.task-text-editing') || document.querySelector('li.pending-move')) return false;
+            const viewAnchor = cloudViewAnchor();
             cloud.applying = true;
             try {
                 localStorage.setItem('myTasks', JSON.stringify(state.tasks || []));
@@ -10479,6 +10534,7 @@ theme: 'system',
                 applyLanguage();
                 checkDeadlineAlerts();
                 updateTailSpace();
+                cloudRestoreView(viewAnchor);
                 return true;
             } finally {
                 // внутри loadTasks возможен saveTasks (назначение id старым
