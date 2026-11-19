@@ -10400,6 +10400,7 @@ theme: 'system',
             shadowTrash: new Map(),
             shadowSettings: null,     // стабильная строка настроек в облаке
             queue: [],                // ожидающие записи {coll, id, data(null=удаление)}
+            dead: [],                 // операции, отклонённые сервером 3 раза (не блокируют очередь)
             flushTimer: null,
             domTimer: null,
             domDirty: false,          // пересборка отложена: правка/отсчёт в полёте
@@ -10412,6 +10413,7 @@ theme: 'system',
             sync.shadowTrash.clear();
             sync.shadowSettings = null;
             sync.queue.length = 0;
+            sync.dead.length = 0;
             if (sync.flushTimer) { clearTimeout(sync.flushTimer); sync.flushTimer = null; }
             if (sync.domTimer) { clearTimeout(sync.domTimer); sync.domTimer = null; }
             sync.domDirty = false;
@@ -10521,8 +10523,11 @@ theme: 'system',
 
         // отправка очереди пачками writeBatch (до 400 операций в пачке).
         // Офлайн commit() сам встаёт в локальный кэш Firestore и довозится
-        // при появлении сети; реальная ошибка — вернуть пачку в начало
-        // очереди и повторить через 15с
+        // при появлении сети; если пачка отклонена ЦЕЛИКОМ (одна битая
+        // операция из старых данных раньше блокировала всю очередь навсегда)
+        // — операции отправляются ПО ОДНОЙ, у каждой своя изоляция ошибок:
+        // три неудачи подряд → sync.dead (не блокирует очередь), причина
+        // и код ошибки — в консоли и в строке статуса
         function syncFlush() {
             sync.flushTimer = null;
             if (!cloud.ready || !cloud.user || !cloud.fs || !sync.queue.length) return;
@@ -10543,12 +10548,39 @@ theme: 'system',
                 batch.commit().then(() => {
                     cloudUpdateStatus(false);
                 }).catch((err) => {
-                    console.error('Ошибка записи в Firebase:', err);
-                    cloudShowConnError();
-                    sync.queue = chunk.concat(sync.queue);
-                    if (!sync.flushTimer) sync.flushTimer = setTimeout(syncFlush, 15000);
+                    console.error('Ошибка записи в Firebase (пачка из ' + chunk.length + '):', err && (err.code || err.message) || err);
+                    cloudShowConnError(err);
+                    // изоляция: по одной операции, у каждой своя судьба
+                    chunk.forEach(op => syncWriteOne(op, uid));
                 });
             }
+        }
+
+        function syncWriteOne(op, uid) {
+            let p;
+            if (op.coll === 'settings') {
+                p = cloud.fs.setDoc(cloud.fs.doc(cloud.db, 'taskStates', uid),
+                    { settings: op.data, updatedAt: cloud.fs.serverTimestamp() });
+            } else {
+                const ref = cloud.fs.doc(cloud.db, 'taskStates', uid, op.coll, op.id);
+                p = op.data
+                    ? cloud.fs.setDoc(ref, Object.assign({ updatedAt: cloud.fs.serverTimestamp() }, op.data))
+                    : cloud.fs.deleteDoc(ref);
+            }
+            p.then(() => {
+                cloudUpdateStatus(false);
+            }).catch((err) => {
+                op.fails = (op.fails || 0) + 1;
+                console.error('Ошибка записи ' + op.coll + '/' + op.id + ' (попытка ' + op.fails + '):', err && (err.code || err.message) || err);
+                cloudShowConnError(err);
+                if (op.fails >= 3) {
+                    sync.dead.push(op);
+                    console.error('Операция отложена в dead-letter (3 неудачи) — очередь разблокирована:', op.coll + '/' + op.id);
+                } else {
+                    sync.queue.push(op);
+                }
+                if (!sync.flushTimer) sync.flushTimer = setTimeout(syncFlush, 15000);
+            });
         }
 
         // document-позиция верха элемента: сумма offsetTop по цепочке
@@ -10652,7 +10684,7 @@ theme: 'system',
                     syncFirstPullCheck();
                 }
                 if (changed) syncScheduleDom();
-            }, (err) => { console.error('Ошибка подписки tasks:', err); cloudShowConnError(); });
+            }, (err) => { console.error('Ошибка подписки tasks:', err); cloudShowConnError(err); });
             sync.unsubTrash = fs.onSnapshot(fs.collection(db, 'taskStates', uid, 'trash'), (snap) => {
                 let changed = false;
                 snap.docChanges().forEach(ch => {
@@ -10664,7 +10696,7 @@ theme: 'system',
                     syncFirstPullCheck();
                 }
                 if (changed) syncScheduleDom();
-            }, (err) => { console.error('Ошибка подписки trash:', err); cloudShowConnError(); });
+            }, (err) => { console.error('Ошибка подписки trash:', err); cloudShowConnError(err); });
             sync.unsubSettings = fs.onSnapshot(fs.doc(db, 'taskStates', uid), (snap) => {
                 if (!snap.metadata.fromCache && !sync.gotSettings) {
                     sync.gotSettings = true;
@@ -10686,7 +10718,7 @@ theme: 'system',
                 loadSettings();
                 applyTheme();
                 applyTaskFontSize();
-            }, (err) => { console.error('Ошибка подписки настроек:', err); cloudShowConnError(); });
+            }, (err) => { console.error('Ошибка подписки настроек:', err); cloudShowConnError(err); });
         }
 
         // все три подписки видели сервер: можно отправлять локальное и отдавать
@@ -10714,12 +10746,14 @@ theme: 'system',
             console.error('Firebase auth:', code, e);
         }
 
-        // мёртвый канал live-обновлений: показать в статусе синхронизации
-        // (обычный статус вернёт следующая успешная отправка/применение)
-        function cloudShowConnError() {
+        // мёртвый канал live-обновлений / отказ записи: показать в статусе
+        // синхронизации с кодом ошибки (обычный статус вернёт следующая
+        // успешная отправка/применение)
+        function cloudShowConnError(err) {
             const st = document.getElementById('syncStatus');
             if (!st || !cloud.ready) return;
-            st.textContent = t('syncConnError');
+            const code = err && (err.code || err.message);
+            st.textContent = t('syncConnError') + (code ? ' [' + code + ']' : '');
             st.style.color = 'var(--text-danger)';
         }
 
