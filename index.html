@@ -668,12 +668,9 @@
         li.pinned .pin-btn .pin-body { fill: currentColor; }
         li.completed { background-color: var(--bg-task-completed); }
         li.completed .deadline-display,
-        li.completed .task-date,
         li.completed .deadline-btn,
         li.completed .auto-sort-icon { display: none; }
         li.completed .pin-btn { visibility: hidden; }
-        /* ⓘ у повторов больше не скрыт: он в строке действий справа,
-           конфликта с плашкой слева нет */
         .auto-sort-icon {
             color: var(--text-muted);
             user-select: none;
@@ -904,6 +901,11 @@
         .task-meta .drag-handle,
         .task-meta .auto-sort-icon { margin-right: 4px; }
         .task-date {
+    /* кнопка ⓘ убрана (по просьбе пользователя): «создано/изменено»
+       переехали в карточки-подсказки по клику на плашку дедлайна.
+       Элемент остаётся в DOM как скрытый носитель createdAt/editedAt
+       для попапов и сериализации */
+    display: none;
     font-size: 11px;
     color: var(--text-muted);
     font-style: italic;
@@ -911,7 +913,6 @@
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
-    display: inline-flex;
     align-items: center;
     justify-content: center;
     /* коробка ЕДИНАЯ с кнопками действий (28×28): во Firefox на
@@ -922,6 +923,9 @@
     width: 28px;
     border-radius: 4px;
 }
+        /* у задач БЕЗ дедлайна ⓘ возвращается: плашки нет, кликнуть нечего —
+           создано/изменено доступны только через неё */
+        .draggable-task .task-date { display: inline-flex; }
         .task-date:hover { color: var(--text-secondary); }
         .task-completed-info {
             font-size: 11px;
@@ -5721,7 +5725,9 @@ theme: 'system',
             showInfoPopup(anchor, rows);
         }
 
-        // карточка активной задачи: создания/правки/дедлайн/повтор
+        // карточка активной задачи: создания/правки/дедлайн/повтор.
+        // Открывается кликом по плашке дедлайна (кнопка ⓘ убрана);
+        // «Изменить время» ведёт в окно дедлайна
         function showActiveInfoPopup(anchor, li) {
             const dateEl = li.querySelector('.task-date');
             const chip = li.querySelector('.deadline-display');
@@ -5731,7 +5737,21 @@ theme: 'system',
             if (dateEl && dateEl.dataset.editedAt) rows.push([t('editedPrefix'), formatFullDate(new Date(dateEl.dataset.editedAt))]);
             if (chip && chip.dataset.deadline) rows.push([t('deadlineAt'), formatFullDate(new Date(chip.dataset.deadline))]);
             if (rule) rows.push([t('repeatTitle'), repeatRuleText(rule)]);
-            showInfoPopup(anchor, rows);
+            const buttons = [{
+                label: chip ? t('changeTimeTitle') : t('deadlineTitle'),
+                action: () => {
+                    closeTaskInfoPopup();
+                    currentEditingTask = li;
+                    if (chip) {
+                        modalTitle.dataset.key = 'changeDeadlineTitle';
+                        modalTitle.textContent = t('changeDeadlineTitle');
+                    } else {
+                        modalTitle.textContent = t('deadlineTitle');
+                    }
+                    openDeadlineModal(li, chip ? chip.dataset.deadline : null);
+                }
+            }];
+            showInfoPopup(anchor, rows, buttons);
         }
 
         // карточка корзины: жизненный цикл задачи + время удаления
@@ -6542,18 +6562,12 @@ theme: 'system',
                     const resolved = resolveTaskLi(li);
                     const chip = e.target.closest('.deadline-display');
                     const rule = resolved.dataset.repeat ? parseRepeatRule(resolved.dataset.repeat) : null;
-                    // у повторяющейся клик по плашке — карточка-подсказка
-                    // (серия, слот, подтверждения), не окно изменения времени;
-                    // повторный клик закрывает
-                    if (rule) {
-                        if (taskInfoPopup && taskInfoPopup._anchor === chip) { closeTaskInfoPopup(); return; }
-                        showReminderPopup(chip, resolved);
-                        return;
-                    }
-                    currentEditingTask = resolved;
-                    modalTitle.dataset.key = 'changeDeadlineTitle';
-                    modalTitle.textContent = t('changeDeadlineTitle');
-                    openDeadlineModal(currentEditingTask, chip.dataset.deadline);
+                    // клик по плашке (и у повторов, и у обычных дедлайнов) —
+                    // карточка-подсказка; повторный клик закрывает. Окно
+                    // изменения времени — кнопкой «Изменить время» в подсказке
+                    if (taskInfoPopup && taskInfoPopup._anchor === chip) { closeTaskInfoPopup(); return; }
+                    if (rule) showReminderPopup(chip, resolved);
+                    else showActiveInfoPopup(chip, resolved);
                     return;
                 }
             });
@@ -7948,10 +7962,9 @@ theme: 'system',
 
             if (task.deadline) {
                 const dl = createDeadlineElement(task.deadline, task.repeat);
-                // у повторяющихся плашка слева (дата и ручка там скрыты),
-                // у обычных — справа, рядом с кнопками
-                if (task.repeat) metaLeft.appendChild(dl);
-                else actions.appendChild(dl);
+                // плашка дедлайна всегда слева, в мета-строке — у повторов
+                // и обычных одинаково (по просьбе пользователя)
+                metaLeft.appendChild(dl);
                 updateDeadlineStatus(li, task.deadline, task.completed);
             } else if (!task.completed) {
                 const dlBtn = document.createElement('button');
@@ -8113,6 +8126,10 @@ theme: 'system',
             const rule = parseRepeatRule(li.dataset.repeat);
             const due = li.classList.contains('reminder-due');
             const rows = [];
+            // создано/изменено переехали сюда из кнопки ⓘ (по просьбе пользователя)
+            const dateEl = li.querySelector('.task-date');
+            if (dateEl && dateEl.dataset.createdAt) rows.push([t('infoCreated'), formatFullDate(new Date(dateEl.dataset.createdAt))]);
+            if (dateEl && dateEl.dataset.editedAt) rows.push([t('editedPrefix'), formatFullDate(new Date(dateEl.dataset.editedAt))]);
             if (rule) rows.push([t('repeatTitle'), repeatRuleText(rule)]);
             if (chip && chip.dataset.deadline) {
                 rows.push([due ? t('slotDue') : t('slotNext'), formatFullDate(new Date(chip.dataset.deadline))]);
@@ -9919,11 +9936,13 @@ theme: 'system',
             try {
                 // страховка при молчащем watch-потоке: пока первая синхронизация
                 // не завершилась — прямой опрос сервера раз в 20с; после — раз
-                // в минуту, если серверных событий давно не было
+                // в 5 минут, если серверных событий давно не было (watch сам
+                // обновляет lastServerSeen при живом потоке, опрос почти
+                // не срабатывает и не мешает мгновенной доставке)
                 if (cloud.ready && cloud.user
                     && Date.now() - (sync.lastServerCheck || 0) > 20000
                     && (!sync.gotTasks || !sync.gotTrash || !sync.gotSettings
-                        || Date.now() - (sync.lastServerSeen || 0) > 60000)) {
+                        || Date.now() - (sync.lastServerSeen || 0) > 300000)) {
                     syncServerCheck();
                 }
                 // пересборка, отложенная из-за правки/отсчёта (syncScheduleDom):
