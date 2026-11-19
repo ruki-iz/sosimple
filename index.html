@@ -9917,6 +9917,15 @@ theme: 'system',
         // каждые 5 с — дедлайны и заголовок вкладки
         function backgroundTick() {
             try {
+                // страховка при молчащем watch-потоке: пока первая синхронизация
+                // не завершилась — прямой опрос сервера раз в 20с; после — раз
+                // в минуту, если серверных событий давно не было
+                if (cloud.ready && cloud.user
+                    && Date.now() - (sync.lastServerCheck || 0) > 20000
+                    && (!sync.gotTasks || !sync.gotTrash || !sync.gotSettings
+                        || Date.now() - (sync.lastServerSeen || 0) > 60000)) {
+                    syncServerCheck();
+                }
                 // пересборка, отложенная из-за правки/отсчёта (syncScheduleDom):
                 // localStorage уже содержит удалённые изменения — догоняем,
                 // как только они ушли
@@ -10405,7 +10414,8 @@ theme: 'system',
             domTimer: null,
             domDirty: false,          // пересборка отложена: правка/отсчёт в полёте
             unsubTasks: null, unsubTrash: null, unsubSettings: null,
-            gotTasks: false, gotTrash: false, gotSettings: false
+            gotTasks: false, gotTrash: false, gotSettings: false,
+            lastServerCheck: 0, lastServerSeen: 0
         };
 
         function syncReset() {
@@ -10414,6 +10424,8 @@ theme: 'system',
             sync.shadowSettings = null;
             sync.queue.length = 0;
             sync.dead.length = 0;
+            sync.lastServerCheck = 0;
+            sync.lastServerSeen = 0;
             if (sync.flushTimer) { clearTimeout(sync.flushTimer); sync.flushTimer = null; }
             if (sync.domTimer) { clearTimeout(sync.domTimer); sync.domTimer = null; }
             sync.domDirty = false;
@@ -10667,13 +10679,74 @@ theme: 'system',
             sendNativeReminders();
         }
 
+        // прямой опрос сервера — страховка на случай, когда watch-поток
+        // подключён, но серверный снапшот не приходит (наблюдалось на обеих
+        // копиях: got-флаги оставались false, записи были заперты гвардом).
+        // Читает задачи/корзину/настройки напрямую (source:'server'),
+        // взводит got-флаги, доводит первую синхронизацию до конца и держит
+        // состояние свежим даже без живого потока событий
+        function syncServerCheck() {
+            if (!cloud.ready || !cloud.user || !cloud.fs) return;
+            sync.lastServerCheck = Date.now();
+            const uid = cloud.user.uid;
+            const tasksP = cloud.fs.getDocs(cloud.fs.collection(cloud.db, 'taskStates', uid, 'tasks'), { source: 'server' });
+            const trashP = cloud.fs.getDocs(cloud.fs.collection(cloud.db, 'taskStates', uid, 'trash'), { source: 'server' });
+            const settingsP = cloud.fs.getDoc(cloud.fs.doc(cloud.db, 'taskStates', uid), { source: 'server' });
+            Promise.allSettled([tasksP, trashP, settingsP]).then(([tR, trR, sR]) => {
+                let changed = false;
+                if (tR.status === 'fulfilled') {
+                    sync.gotTasks = true;
+                    tR.value.forEach(d => { if (syncApplyRemote('tasks', d.id, syncStripDoc(d.data()))) changed = true; });
+                } else {
+                    cloudShowConnError(tR.reason);
+                }
+                if (trR.status === 'fulfilled') {
+                    sync.gotTrash = true;
+                    trR.value.forEach(d => { if (syncApplyRemote('trash', d.id, syncStripDoc(d.data()))) changed = true; });
+                } else {
+                    cloudShowConnError(trR.reason);
+                }
+                if (sR.status === 'fulfilled') {
+                    sync.gotSettings = true;
+                    if (sR.value.exists()) {
+                        // настройки: пришедшее объединяется с локальным — тема и
+                        // телефонные напоминания остаются локальными
+                        const incoming = sR.value.data().settings || {};
+                        const local = JSON.parse(localStorage.getItem('appSettings') || '{}');
+                        if (typeof local.theme === 'string') incoming.theme = local.theme;
+                        ['phoneRemindDeadlines', 'phoneRemindDeadlinesMin', 'phoneRemindRepeats', 'phoneRemindRepeatsMin'].forEach(k => {
+                            if (local[k] !== undefined) incoming[k] = local[k];
+                        });
+                        const json = cloudStable(incoming);
+                        if (json !== sync.shadowSettings) {
+                            sync.shadowSettings = json;
+                            localStorage.setItem('appSettings', JSON.stringify(incoming));
+                            loadSettings();
+                            applyTheme();
+                            applyTaskFontSize();
+                        }
+                    }
+                } else {
+                    cloudShowConnError(sR.reason);
+                }
+                if (sync.gotTasks && sync.gotTrash && sync.gotSettings) {
+                    const wasDone = cloud.firstSyncDone;
+                    cloudSetFirstSyncDone();
+                    flushNativeConfirm();
+                    syncLocalDiff(); // первый pull — объединение (или обычный diff после него)
+                    if (!wasDone) cloudUpdateStatus(true);
+                }
+                if (changed) syncScheduleDom();
+            }).catch((err) => { console.error('Ошибка прямого опроса сервера:', err); cloudShowConnError(err); });
+        }
+
         // подписки: коллекция задач, коллекция корзины, документ настроек.
         // События приходят только по изменённым документам — каждый
         // применяется к localStorage отдельно, пересборка DOM отложенная
-        function syncSubscribe() {
-            const uid = cloud.user.uid;
+        function syncSubscribe() {            const uid = cloud.user.uid;
             const fs = cloud.fs, db = cloud.db;
             sync.unsubTasks = fs.onSnapshot(fs.collection(db, 'taskStates', uid, 'tasks'), (snap) => {
+                if (!snap.metadata.fromCache) sync.lastServerSeen = Date.now();
                 let changed = false;
                 snap.docChanges().forEach(ch => {
                     const data = ch.type === 'removed' ? null : syncStripDoc(ch.doc.data());
@@ -10686,6 +10759,7 @@ theme: 'system',
                 if (changed) syncScheduleDom();
             }, (err) => { console.error('Ошибка подписки tasks:', err); cloudShowConnError(err); });
             sync.unsubTrash = fs.onSnapshot(fs.collection(db, 'taskStates', uid, 'trash'), (snap) => {
+                if (!snap.metadata.fromCache) sync.lastServerSeen = Date.now();
                 let changed = false;
                 snap.docChanges().forEach(ch => {
                     const data = ch.type === 'removed' ? null : syncStripDoc(ch.doc.data());
@@ -10698,6 +10772,7 @@ theme: 'system',
                 if (changed) syncScheduleDom();
             }, (err) => { console.error('Ошибка подписки trash:', err); cloudShowConnError(err); });
             sync.unsubSettings = fs.onSnapshot(fs.doc(db, 'taskStates', uid), (snap) => {
+                if (!snap.metadata.fromCache) sync.lastServerSeen = Date.now();
                 if (!snap.metadata.fromCache && !sync.gotSettings) {
                     sync.gotSettings = true;
                     syncFirstPullCheck();
@@ -10719,6 +10794,9 @@ theme: 'system',
                 applyTheme();
                 applyTaskFontSize();
             }, (err) => { console.error('Ошибка подписки настроек:', err); cloudShowConnError(err); });
+            // страховка: если watch-поток не доставит первый снапшот,
+            // прямой опрос доведёт первую синхронизацию до конца
+            setTimeout(syncServerCheck, 8000);
         }
 
         // все три подписки видели сервер: можно отправлять локальное и отдавать
@@ -10893,22 +10971,10 @@ theme: 'system',
                 const flushPendingNow = () => { if (sync.flushTimer) syncFlush(); };
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'hidden') { flushPendingNow(); return; }
-                    if (!cloud.user || !sync.gotTasks) return;
-                    // возврат на вкладку: подтянуть состояние напрямую —
-                    // замороженная вкладка или мёртвый канал догоняют и без
-                    // событий (применение идёт по документам, без изменений —
-                    // без пересборки)
-                    const uid = cloud.user.uid;
-                    cloud.fs.getDocs(cloud.fs.collection(cloud.db, 'taskStates', uid, 'tasks'), { source: 'server' }).then(s => {
-                        let changed = false;
-                        s.forEach(d => { if (syncApplyRemote('tasks', d.id, syncStripDoc(d.data()))) changed = true; });
-                        if (changed) syncScheduleDom();
-                    }).catch(() => { /* офлайн — снапшот догонит */ });
-                    cloud.fs.getDocs(cloud.fs.collection(cloud.db, 'taskStates', uid, 'trash'), { source: 'server' }).then(s => {
-                        let changed = false;
-                        s.forEach(d => { if (syncApplyRemote('trash', d.id, syncStripDoc(d.data()))) changed = true; });
-                        if (changed) syncScheduleDom();
-                    }).catch(() => { /* офлайн — снапшот догонит */ });
+                    if (!cloud.user) return;
+                    // возврат на вкладку: прямой опрос сервера — замороженная
+                    // вкладка или мёртвый watch-поток догоняют и без событий
+                    syncServerCheck();
                 });
                 // уничтожение страницы (обновление APK, закрытие вкладки)
                 window.addEventListener('pagehide', flushPendingNow);
