@@ -184,7 +184,9 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 6px 10px 15px;
+            /* 4px по бокам (1.10.9, просьба пользователя «границы съедают
+               ширину»): внешний отступ экран→панель сокращён вдвое */
+            padding: 6px 4px 15px;
             transition: background-color 0.3s, color 0.3s;
             overflow-x: hidden;
         }
@@ -192,7 +194,9 @@
         html, body { overflow-anchor: none; }
         .panel {
             background: var(--bg-panel);
-            padding: 10px;
+            /* 6px по бокам / 10px по вертикали (1.10.9): панель→карточка
+               сокращён вдвое; вместе с body 4px карточка шире на 20px */
+            padding: 10px 6px;
             border-radius: 12px;
             box-shadow: var(--shadow-panel);
             width: 100%;
@@ -504,6 +508,10 @@
 
 
         li.label-hover:not(.completed) {
+            /* курсор зоны метки — указательный палец: радуга обещает клик в
+               пикер, и вся зона (кроме ручки перетаскивания с её grab и
+               текста с его caret) показывает это курсором (1.11.15) */
+            cursor: pointer;
             background-image: linear-gradient(to bottom,
                 var(--task-color-red),
                 var(--task-color-orange),
@@ -606,6 +614,10 @@
             top: 0;
             bottom: 0;
             width: 17px;
+            /* полоса метки — клик-таргет пикера: указательный палец (1.11.14;
+               попытка 1.11.13 наследовать курсор карточки давала «хватающую
+               ладонь» на метке перетаскиваемых задач). Сама иконка
+               перетаскивания остаётся с grab — это её аффорданс */
             cursor: pointer;
             z-index: 1;
             pointer-events: auto;
@@ -706,6 +718,10 @@
             color: var(--text-primary);
             transition: max-height 0.3s ease, background-color 0.15s ease;
             overflow-anchor: none;
+            /* зона метки захлёстывает на первые 6px текста — без этого тап
+               в захлёсте подсвечивал текст системной рамкой, хотя открывается
+               пикер метки */
+            -webkit-tap-highlight-color: transparent;
         }
         /* градиентное затухание текста у свёрнутой задачи */
         .task-text-faded {
@@ -772,6 +788,11 @@
         li.completed .task-text:hover { background-color: transparent; }
         .task-text-editing {
             width: 100%;
+            /* поле обнимает текст: без min-height и вертикального паддинга
+               бокс равен высоте строк (14px×1.3) — текст при входе в правку
+               НЕ сдвигается, и нет пустоты под одной строкой (попытка
+               центрировать паддингом 5px давала прыжок текста вниз при
+               входе в правку — отменена) */
             padding: 0;
             border: none;
             border-radius: 4px;
@@ -783,7 +804,6 @@
             background: var(--bg-panel);
             color: var(--text-primary);
             box-sizing: border-box;
-            min-height: 28px;
             overflow: hidden;
             position: relative;
             z-index: 1002;
@@ -924,8 +944,16 @@
     border-radius: 4px;
 }
         /* у задач БЕЗ дедлайна ⓘ возвращается: плашки нет, кликнуть нечего —
-           создано/изменено доступны только через неё */
-        .draggable-task .task-date { display: inline-flex; }
+           создано/изменено доступны только через неё. Цвет и прозрачность —
+           как у соседних кнопок (.action-btn: secondary при opacity 0.5);
+           базовые «даточные» muted/italic остаются скрытому носителю */
+        .draggable-task .task-date {
+            display: inline-flex;
+            color: var(--text-secondary);
+            opacity: 0.5;
+            transition: all 0.3s;
+        }
+        .draggable-task .task-date:hover { opacity: 1; }
         .task-date:hover { color: var(--text-secondary); }
         .task-completed-info {
             font-size: 11px;
@@ -979,6 +1007,11 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            /* системная подсветка касания выключена: зона клика метки
+               захлёстывает на первые 6px плашки (1.10.28), и тап по зоне
+               подсвечивал плашку («анимация нажатия») при том, что открывается
+               пикер метки */
+            -webkit-tap-highlight-color: transparent;
         }
         .deadline-display:hover { background-color: var(--accent-primary-bg-hover); }
         .deadline-display.overdue { background-color: var(--accent-danger-bg); }
@@ -1018,7 +1051,7 @@
         .toggle-btn:hover { background-color: var(--accent-success-bg); color: var(--text-success); }
         li.completed .toggle-btn { color: var(--text-secondary); }
         li.completed .toggle-btn:hover { background-color: var(--accent-primary-bg); color: var(--accent-primary); }
-        .drag-handle { color: var(--text-faint); cursor: grab; user-select: none; line-height: 1.5; display: inline-flex; align-items: center; height: 24px; }
+        .drag-handle { color: var(--text-faint); cursor: grab; user-select: none; line-height: 1.5; display: inline-flex; align-items: center; height: 24px; -webkit-tap-highlight-color: transparent; }
         .modal-overlay {
             display: none;
             position: fixed;
@@ -1036,6 +1069,14 @@
         /* окна «Выполненные»/«Корзина»: верхний край всегда на уровне
            полного окна (10vh), независимо от количества задач */
         .modal-overlay:has(.modal-wide) { align-items: flex-start; padding-top: 10vh; }
+        /* окно «Установить время» (1.10.22, жалоба «клавиатура открывается —
+           окно уезжает наверх»): центрирование при adjustResize
+           перецентрировало окно в сжатой клавиатурой области — резкий
+           перескок. Теперь окно привязано к ВЕРХУ (как выполненные/корзина),
+           а отступ сверху замораживается в ПИКСЕЛЯХ на момент открытия
+           (openDeadlineModal ставит inline paddingTop) — vh пересчитался бы
+           под сжатый вьюпорт и дал бы микросдвиг, px стоит мёртво */
+        #deadlineModal.active { align-items: flex-start; padding-top: 10vh; }
         .modal {
             background: var(--bg-modal);
             padding: 25px;
@@ -1132,6 +1173,24 @@
         .modal-close-btn:hover { background: var(--accent-black-hover); color: var(--text-primary); }
         .settings-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; }
         .settings-group label { font-size: 14px; color: var(--text-primary); flex: 1; }
+        /* подпись, обёрнутая в div (label + подсказка), — та же гибкость,
+           что у прямых label: иначе селект со своим самым длинным пунктом
+           отжимал ширину и подпись заворачивалась в 3-4 строки (1.11.12).
+           Колонку контролов collapse-setting исключаем: она должна быть
+           по ширине содержимого, а не половиной строки */
+        .settings-group > div:not(.collapse-setting-controls) { flex: 1; min-width: 0; }
+        /* заголовки секций окна настроек (1.10.23): Вид / Поведение /
+           Напоминания / Данные — мелкие серые подписи над группами */
+        .settings-section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin: 18px 0 6px 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .modal-scroll .settings-section-title:first-child { margin-top: 0; }
         .settings-group select {
             padding: 4px 8px;
             border: 2px solid var(--border-input);
@@ -1202,6 +1261,10 @@ font-size: 14px;
             background-color: var(--accent-primary-bg);
             color: var(--accent-primary);
         }
+        /* статус батарейного исключения: ограничена — тревожный цвет,
+           без ограничений — зелёный */
+        #phoneBatteryStatus:not(.battery-ok) { color: var(--text-danger); }
+        #phoneBatteryStatus.battery-ok { color: var(--text-success); }
         .settings-danger { border-top: 1px solid var(--border-danger); padding-top: 15px; margin-top: 5px; }
         .settings-sync { border-top: 1px solid var(--border-backup); padding-top: 15px; margin-top: 5px; flex-direction: column; align-items: stretch; }
         .sync-status { font-size: 11px; color: var(--text-muted); margin: 4px 0 8px 0; min-height: 14px; }
@@ -1269,6 +1332,8 @@ font-size: 14px;
             align-items: center;
             justify-content: center;
             line-height: 1;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
         .modal-btn-outline:hover { background: var(--accent-black-hover); }
         .modal-btn-outline:active { background: var(--accent-black-active); }
@@ -1391,7 +1456,13 @@ font-size: 14px;
             font-size: 20px;
             color: var(--text-secondary);
             cursor: pointer;
-            padding: 2px 10px;
+            /* единая высота 26px для ВСЕХ кнопок шапки (стрелки-ствс были
+               ниже текстовых −/+ и квадрата — 1.10.21) */
+            height: 26px;
+            padding: 0 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             border-radius: 4px;
             line-height: 1;
             /* visibility не в списке: переход по ней (через all) держит
@@ -1400,6 +1471,9 @@ font-size: 14px;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
         }
+        /* svg-стрелки листания (1.10.14, вместо текстовых <> — «скобки,
+           а не кнопки») — block, чтобы inline-зазор не сдвигал базовую линию */
+        .calendar-nav-btn svg { display: block; }
         /* hover только при настоящем наведении: на сенсорных экранах
            он иначе «залипает» после нажатия */
         @media (hover: hover) {
@@ -1596,9 +1670,53 @@ font-size: 14px;
         .input-container .char-counter { grid-area: counter; }
         .input-container .input-buttons { grid-area: buttons; }
         .input-container .search-row { margin: 0; }
+        /* окно поиска в блоке создания (1.10.8, просьба пользователя
+           «перенести счётчик и кнопку под поле»): search-row растёт в
+           два этажа и растягивается на ВСЕ три grid-ряда (swap/counter/
+           buttons) — под полем и так пустуют скрытые через visibility
+           строки счётчика символов и кнопок создания, поэтому высота
+           панели при переключении поля ↔ поиск не меняется и список
+           не прыгает; строки модалок «Выполненных»/«Корзины» остаются
+           однострочными (правка скоупится .input-container) */
+        .input-container .search-row {
+            flex-direction: column;
+            align-items: stretch;
+            row-gap: 4px;
+            grid-row: swap-start / buttons-end;
+        }
         .input-container .search-row input {
             height: 32px;
+            flex: none;
             box-sizing: border-box;
+        }
+        .input-container .search-subrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            /* прижать к НИЗУ растянутой строки поиска — уровень ряда кнопок
+               создания (часы/инструменты/+), просьба пользователя «опустить
+               пониже» (1.10.16); до этого подстрока стояла сразу под полем */
+            margin-top: auto;
+        }
+        /* «Сбросить фильтры» под «Ничего не найдено» (1.10.13) */
+        .empty-reset-btn {
+            display: none;
+            margin: 2px auto 6px;
+            padding: 6px 18px;
+            background: none;
+            border: 1px solid var(--border-input);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 12px;
+            color: var(--accent-primary);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        @media (hover: hover) {
+            .empty-reset-btn:hover { border-color: var(--accent-primary); }
         }
         /* переключатель вида списка: список / календарь */
         /* три блока активных задач: закреплённые / дедлайны / без дедлайна.
@@ -1660,7 +1778,9 @@ font-size: 14px;
                при выборе дня −/+ не сдвигаются */
             visibility: hidden;
         }
-        .cal-day-clear:hover { background: var(--accent-black-hover); color: var(--text-primary); }
+        /* hover как у соседних calendar-nav-btn (accent-подсветка), раньше
+           серел по-своему — жалоба «подсвечивается не так, как остальные» */
+        .cal-day-clear:hover { background: var(--accent-primary-bg); color: var(--accent-primary); }
         #emptyPanel .empty-msg { margin: 8px 0; }
         .tasks-calendar { padding: 0 6px 8px 6px; }
         .cal-title { font-size: 14px; color: var(--text-primary); min-width: 108px; text-align: center; user-select: none; -webkit-user-select: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
@@ -1743,7 +1863,7 @@ font-size: 14px;
             .cal-cell.selected.reset-hover::before,
             .cal-cell.selected:hover::after,
             .cal-cell.selected:hover::before { display: block; }
-            .cal-day-clear.reset-hover { background: var(--accent-black-hover); color: var(--text-primary); }
+            .cal-day-clear.reset-hover { background: var(--accent-primary-bg); color: var(--accent-primary); }
         }
         /* will-change: отдельный композитный слой — scale применяется к
            закэшированной текстуре. Без него прямые рёбра квадрата на дробных
@@ -2001,7 +2121,7 @@ font-size: 14px;
             .pin-btn:hover { color: var(--text-primary); }
             .delete-btn:hover, .deadline-btn:hover, .toggle-btn:hover { color: var(--text-secondary); background-color: transparent; }
             li.completed .toggle-btn:hover { color: var(--text-secondary); background-color: transparent; }
-            .task-date:hover { color: var(--text-muted); background-color: transparent; }
+            .task-actions .task-date:hover { color: var(--text-secondary); background-color: transparent; opacity: 0.5; }
             li.task-expanded .collapse-toggle:hover { background-color: transparent; }
             li.task-collapsed .task-content:not(.hover-suppressed):has(.task-text:hover) .task-text,
             li.task-collapsed .task-content:not(.hover-suppressed):has(.collapse-toggle:hover) .task-text {
@@ -2043,6 +2163,10 @@ font-size: 14px;
             .info-popup .info-popup-btn.primary:hover { filter: none; }
             .modal-close-btn:hover { background: transparent; color: var(--text-secondary); }
             .modal-btn-outline:hover { background: transparent; }
+            /* кнопки разрешений Android: их собственный hover специфичнее
+               общего нейтрализатора выше и на таче «залипал» синей плиткой —
+               гасим тем же составом (та же специфичность, позже по листу) */
+            .phone-buttons .modal-btn-outline:hover { background: transparent; color: var(--text-primary); }
             .calendar-trigger-btn:hover:not(.open) { color: var(--text-secondary); }
             .calendar-day:hover { background: transparent; color: var(--text-primary); }
             .calendar-day.other-month:hover { background: transparent; color: var(--text-other-month); }
@@ -2106,8 +2230,12 @@ font-size: 14px;
                  дедлайн и «+» прячутся, общая палитра переключается на фильтр по цвету -->
             <div class="search-row" id="searchRow" style="display: none;">
                 <input type="text" id="searchInput" placeholder="Поиск по задачам…" inputmode="search" enterkeyhint="search">
-                <span class="search-count" id="searchCount"></span>
-                <button id="searchClearBtn" class="search-clear-btn" title="Очистить и закрыть" aria-label="Очистить и закрыть">✕</button>
+                <!-- счётчик и кнопка очистки — под полем: под ним пустуют
+                     скрытые строки счётчика символов и кнопок создания -->
+                <div class="search-subrow">
+                    <span class="search-count" id="searchCount"></span>
+                    <button id="searchClearBtn" class="search-clear-btn" title="Очистить и закрыть" aria-label="Очистить и закрыть">✕</button>
+                </div>
             </div>
             <div class="char-counter" id="taskInputCounter"></div>
             <div class="input-buttons" id="inputButtons">
@@ -2134,9 +2262,9 @@ font-size: 14px;
     <div class="cal-head" id="calTasksHead">
         <button class="calendar-nav-btn" id="calTasksToday" tabindex="-1">•</button>
         <div class="cal-nav-range">
-            <button class="calendar-nav-btn" id="calTasksPrev" tabindex="-1"><</button>
+            <button class="calendar-nav-btn" id="calTasksPrev" tabindex="-1" aria-label="Неделей раньше"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7v10"/><path d="M19 12H6"/><path d="M11 7L6 12l5 5"/></svg></button>
             <span class="cal-title" id="calTasksTitle"></span>
-            <button class="calendar-nav-btn" id="calTasksNext" tabindex="-1">></button>
+            <button class="calendar-nav-btn" id="calTasksNext" tabindex="-1" aria-label="Неделей позже"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7v10"/><path d="M5 12h13"/><path d="M13 7l5 5-5 5"/></svg></button>
         </div>
         <button class="calendar-nav-btn cal-future-btn" id="calFutureRepeats" tabindex="-1" aria-label="Будущие повторы"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
         <div class="cal-rows-pair">
@@ -2160,6 +2288,7 @@ font-size: 14px;
     <div class="block-nav-strip" id="blockNavMid3" style="display: none;"></div>
     <div class="panel panel-tasks" id="emptyPanel">
         <p class="empty-msg" id="searchEmptyMsg" style="display: none;">Ничего не найдено</p>
+        <button type="button" class="empty-reset-btn" id="resetFiltersBtn" style="display: none;"></button>
         <p class="empty-msg" id="emptyMsg" style="display: none;">Список пуст. Добавьте первую задачу!</p>
     </div>
     </div>
@@ -2282,13 +2411,7 @@ font-size: 14px;
                 <button class="modal-close-btn" id="closeSettingsBtn" title="Закрыть (Esc)" aria-label="Закрыть">✕</button>
             </div>
             <div class="modal-scroll">
-            <div class="settings-group">
-                <label for="settingLanguage">Язык</label>
-                <select id="settingLanguage">
-                    <option value="ru">Русский</option>
-                    <option value="en">English</option>
-                </select>
-            </div>
+            <div class="settings-section-title" id="settingsSectionLook">Вид</div>
             <div class="settings-group">
                 <label for="settingTheme" id="themeLabel">Тема оформления</label>
                 <select id="settingTheme">
@@ -2298,25 +2421,10 @@ font-size: 14px;
                 </select>
             </div>
             <div class="settings-group">
-                <label for="settingCompletedDays">Хранить выполненные задачи</label>
-                <select id="settingCompletedDays">
-                    <option value="1">1 день</option>
-                    <option value="3">3 дня</option>
-                    <option value="7">7 дней</option>
-                    <option value="14">14 дней</option>
-                    <option value="30">30 дней</option>
-                    <option value="0">∞</option>
-                </select>
-            </div>
-            <div class="settings-group">
-                <label for="settingTrashDays">Хранить задачи в корзине</label>
-                <select id="settingTrashDays">
-                    <option value="7">7 дней</option>
-                    <option value="14">14 дней</option>
-                    <option value="30">30 дней</option>
-                    <option value="60">60 дней</option>
-                    <option value="90">90 дней</option>
-                    <option value="0">∞</option>
+                <label for="settingLanguage">Язык</label>
+                <select id="settingLanguage">
+                    <option value="ru">Русский</option>
+                    <option value="en">English</option>
                 </select>
             </div>
             <div class="settings-group">
@@ -2327,6 +2435,17 @@ font-size: 14px;
                     <option value="18">18px</option>
                 </select>
             </div>
+            <div class="settings-group">
+                <div>
+                    <label for="settingBlockNav" id="blockNavLabel">Полоска чипов</label>
+                    <div class="settings-hint" id="blockNavHint">быстрые переходы между блоками задач</div>
+                </div>
+                <select id="settingBlockNav">
+                    <option value="floating" id="blockNavFloating">Плавающая</option>
+                    <option value="between" id="blockNavBetween">Между блоками</option>
+                    <option value="off" id="blockNavOff">Выключено</option>
+                </select>
+            </div>
             <div class="settings-group collapse-setting">
                 <div>
                     <label for="settingCollapseActive" id="collapseActiveLabel">Сворачивать длинные задачи</label>
@@ -2334,7 +2453,7 @@ font-size: 14px;
                 </div>
                 <div class="collapse-setting-controls">
                     <input type="checkbox" id="settingCollapseActive">
-                    <input type="text" id="settingCollapseHeight" inputmode="numeric" pattern="[0-9]*" maxlength="4">
+                    <input type="text" id="settingCollapseHeight" inputmode="numeric" pattern="[0-9]*" maxlength="4" enterkeyhint="done">
                 </div>
             </div>
             <div class="settings-group collapse-setting">
@@ -2344,7 +2463,7 @@ font-size: 14px;
                 </div>
                 <div class="collapse-setting-controls">
                     <input type="checkbox" id="settingHideFarReminders">
-                    <input type="text" id="settingHideFarRemindersDays" inputmode="numeric" pattern="[0-9]*" maxlength="3">
+                    <input type="text" id="settingHideFarRemindersDays" inputmode="numeric" pattern="[0-9]*" maxlength="3" enterkeyhint="done">
                 </div>
             </div>
             <div class="settings-group collapse-setting">
@@ -2354,15 +2473,14 @@ font-size: 14px;
                 </div>
                 <div class="collapse-setting-controls">
                     <input type="checkbox" id="settingHideFarTasks">
-                    <input type="text" id="settingHideFarTasksDays" inputmode="numeric" pattern="[0-9]*" maxlength="3">
+                    <input type="text" id="settingHideFarTasksDays" inputmode="numeric" pattern="[0-9]*" maxlength="3" enterkeyhint="done">
                 </div>
             </div>
+
+            <div class="settings-section-title" id="settingsSectionBehavior">Поведение</div>
             <div class="settings-group">
-                <div>
-                    <label for="settingRelativeTime">Относительное время</label>
-                    <div class="settings-hint" id="relativeTimeHint">«5 мин назад» вместо «7 окт, 15:30»</div>
-                </div>
-                <input type="checkbox" id="settingRelativeTime">
+                <label id="newTasksLabel">Новые задачи без дедлайна</label>
+                <button type="button" class="new-task-position-btn" id="newTaskPositionBtn">в конец</button>
             </div>
             <div class="settings-group">
                 <div>
@@ -2371,10 +2489,8 @@ font-size: 14px;
                 </div>
                 <input type="checkbox" id="settingSearchWhileTyping">
             </div>
-            <div class="settings-group">
-                <label id="newTasksLabel">Новые задачи без дедлайна</label>
-                <button type="button" class="new-task-position-btn" id="newTaskPositionBtn">в конец</button>
-            </div>
+
+            <div class="settings-section-title" id="settingsSectionReminders">Напоминания</div>
             <div class="settings-group deadline-alert-setting">
                 <div style="flex: 1; min-width: 0;">
                     <label for="settingDeadlineAlert" id="deadlineAlertLabel">Уведомление в заголовке вкладки</label>
@@ -2395,7 +2511,7 @@ font-size: 14px;
                 </div>
                 <div class="collapse-setting-controls">
                     <input type="checkbox" id="settingPhoneRemindDeadlines">
-                    <input type="text" id="settingPhoneRemindDeadlinesMin" inputmode="numeric" pattern="[0-9]*" maxlength="5">
+                    <input type="text" id="settingPhoneRemindDeadlinesMin" inputmode="numeric" pattern="[0-9]*" maxlength="5" enterkeyhint="done">
                 </div>
             </div>
             <div class="settings-group collapse-setting">
@@ -2405,7 +2521,7 @@ font-size: 14px;
                 </div>
                 <div class="collapse-setting-controls">
                     <input type="checkbox" id="settingPhoneRemindRepeats">
-                    <input type="text" id="settingPhoneRemindRepeatsMin" inputmode="numeric" pattern="[0-9]*" maxlength="5">
+                    <input type="text" id="settingPhoneRemindRepeatsMin" inputmode="numeric" pattern="[0-9]*" maxlength="5" enterkeyhint="done">
                 </div>
             </div>
             <div class="settings-group settings-phone" id="phoneSection" style="display: none;">
@@ -2415,27 +2531,65 @@ font-size: 14px;
                     <button type="button" class="modal-btn-outline" id="phoneNotifBtn">Уведомления</button>
                     <button type="button" class="modal-btn-outline" id="phoneBatteryBtn">Батарея: без ограничений</button>
                 </div>
+                <!-- текущее состояние батарейного исключения (мост APK):
+                     прямой системный запрос — пустой no-op, если исключение
+                     уже дано, поэтому кнопка могла выглядеть мёртвой -->
+                <div class="settings-hint" id="phoneBatteryStatus" style="display: none;"></div>
             </div>
             <div class="settings-group">
                 <div>
-                    <label for="settingAutoConfirm" id="autoConfirmLabel">Автоматически подтверждать напоминания</label>
+                    <label for="settingAutoConfirm" id="autoConfirmLabel">Автоподтверждение напоминаний</label>
                     <div class="settings-hint" id="autoConfirmHint">по наступлении срока переносить на следующую дату</div>
                 </div>
                 <select id="settingAutoConfirm">
                     <option value="off" id="autoConfirmOff">Выключено</option>
-                    <option value="ontime" id="autoConfirmOnTime">По наступлении времени</option>
+                    <option value="ontime" id="autoConfirmOnTime">В момент срока</option>
                     <option value="endofday" id="autoConfirmEndOfDay">В конце дня</option>
                 </select>
             </div>
-            <div class="settings-group">
+
+            <!-- виджет рабочего стола (1.12.0): настройки локальны на
+                 устройстве, как тема и напоминания; в браузере виджета нет —
+                 секция скрыта до проверки моста (см. DOMContentLoaded) -->
+            <div class="settings-section-title" id="settingsSectionWidget" style="display: none;">Виджет</div>
+            <div class="settings-group" id="widgetUpcomingGroup" style="display: none;">
+                <label for="settingWidgetUpcoming" id="widgetUpcomingLabel">Показывать задачи на следующие дни</label>
+                <select id="settingWidgetUpcoming">
+                    <option value="0" id="widgetUpcoming0">Не показывать</option>
+                    <option value="1" id="widgetUpcoming1">1 день</option>
+                    <option value="3" id="widgetUpcoming3">3 дня</option>
+                    <option value="7" id="widgetUpcoming7">7 дней</option>
+                </select>
+            </div>
+            <div class="settings-group" id="widgetTodayFirstGroup" style="display: none;">
                 <div>
-                    <label for="settingBlockNav" id="blockNavLabel">Полоска чипов</label>
-                    <div class="settings-hint" id="blockNavHint">быстрые переходы между блоками задач</div>
+                    <label for="settingWidgetTodayFirst" id="widgetTodayFirstLabel">Сначала задачи на сегодня</label>
+                    <div class="settings-hint" id="widgetTodayFirstHint">закреплённые обычно сверху; включите, чтобы сегодняшние стояли выше закреплённых</div>
                 </div>
-                <select id="settingBlockNav">
-                    <option value="floating" id="blockNavFloating">Плавающая</option>
-                    <option value="between" id="blockNavBetween">Между блоками</option>
-                    <option value="off" id="blockNavOff">Выключено</option>
+                <input type="checkbox" id="settingWidgetTodayFirst">
+            </div>
+
+            <div class="settings-section-title" id="settingsSectionData">Данные</div>
+            <div class="settings-group">
+                <label for="settingCompletedDays">Хранить выполненные задачи</label>
+                <select id="settingCompletedDays">
+                    <option value="1">1 день</option>
+                    <option value="3">3 дня</option>
+                    <option value="7">7 дней</option>
+                    <option value="14">14 дней</option>
+                    <option value="30">30 дней</option>
+                    <option value="0">∞</option>
+                </select>
+            </div>
+            <div class="settings-group">
+                <label for="settingTrashDays">Хранить задачи в корзине</label>
+                <select id="settingTrashDays">
+                    <option value="7">7 дней</option>
+                    <option value="14">14 дней</option>
+                    <option value="30">30 дней</option>
+                    <option value="60">60 дней</option>
+                    <option value="90">90 дней</option>
+                    <option value="0">∞</option>
                 </select>
             </div>
             <div class="settings-group settings-backup">
@@ -2512,7 +2666,6 @@ font-size: 14px;
         const settingSearchWhileTyping = document.getElementById('settingSearchWhileTyping');
         const settingTaskFontSize = document.getElementById('settingTaskFontSize');
         const settingTheme = document.getElementById('settingTheme');
-        const settingRelativeTime = document.getElementById('settingRelativeTime');
         const settingNewTaskOnTop = document.getElementById('settingNewTaskOnTop');
         const settingAutoConfirm = document.getElementById('settingAutoConfirm');
         const settingBlockNav = document.getElementById('settingBlockNav');
@@ -2541,6 +2694,7 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
         const searchCount = document.getElementById('searchCount');
         const searchClearBtn = document.getElementById('searchClearBtn');
         const searchEmptyMsg = document.getElementById('searchEmptyMsg');
+        const resetFiltersBtn = document.getElementById('resetFiltersBtn');
         const inputWrapper = document.getElementById('inputWrapper');
         const inputButtons = document.getElementById('inputButtons');
         const inputTools = document.getElementById('inputTools');
@@ -2605,6 +2759,7 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
         let activeColorFilter = null;
         let completedColorFilter = null;
         let calWeekOffset = 0; // сдвиг бегущего окна календаря в неделях
+        let calTitleLeftHalf = null; // какая половина заголовка под курсором (mousemove/desktop) — синхронизация курсора с доступностью «назад»
         let calWindowStart = null; // стартовая дата текущего окна
         let calendarDayFilter = null;
         let expandedTasks = new WeakSet();       // развёрнутые свёрнутые-задачи (слабые ссылки)
@@ -2612,12 +2767,22 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
         // потолок длины задачи: не настраивается (решать за пользователя,
         // какая длина нужна, не стоит) — защита от случайных гигантских вставок
         const MAX_TASK_LENGTH = 5000;
-        // Зона клика по цветной метке слева от задачи: 5px снаружи + 4px метка + 8px внутренний отступ (см. li::before)
-        const LABEL_ZONE_X_MIN = -5;
-        const LABEL_ZONE_X_MAX = 12;
-        // у повторяющихся задач метка справа — зону делаем уже, чтобы она
-        // не наезжала на висящую рядом корзину
-        function labelZoneMax(li) { return LABEL_ZONE_X_MAX; }
+        // Зона клика по цветной метке (1.10.27, просьба «область клика
+        // максимальная по ширине — от самого левого края до начала
+        // текстового поля»: после сужения боковых границ попадать по узкой
+        // полоске на смартфоне стало трудно): от края карточки (вся полоса
+        // свайпа li::before, включая 9px снаружи) до фактического начала
+        // .task-text. Текстовый порог считается от реальной позиции текста
+        const LABEL_ZONE_X_MIN = -9;
+        const LABEL_ZONE_X_MAX = 12; // фолбэк, если .task-text не найден
+        function labelZoneMax(li) {
+            const textEl = li.querySelector('.task-text');
+            if (!textEl) return LABEL_ZONE_X_MAX;
+            // floor от края текстового спана + 6px захлёст ПОВЕРХ текста и
+            // плашки дедлайна (1.10.28, «толстым пальцем все равно не нажать»):
+            // клики в этой полосе открывают палитру меток, а не правку/попап
+            return Math.max(LABEL_ZONE_X_MAX, Math.floor(textEl.getBoundingClientRect().left - li.getBoundingClientRect().left) + 6);
+        }
         function getMaxTaskLength() { return MAX_TASK_LENGTH; }
         function getCounterThreshold() { return Math.floor(getMaxTaskLength() * 0.85); }
         const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
@@ -2733,15 +2898,23 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
                 deadlinePast: '⚠ Дедлайн не может быть в прошлом',
                 remove: 'Удалить', save: 'Сохранить',
                 settingsTitle: 'Настройки', langLabel: 'Язык',
+                widgetEmpty: 'Нет задач на сегодня',
+                widgetIdle: 'Нет закреплённых и задач на сегодня',
+                settingsSectionLook: 'Вид', settingsSectionBehavior: 'Поведение',
+                settingsSectionReminders: 'Напоминания', settingsSectionData: 'Данные',
+                settingsSectionWidget: 'Виджет',
+                widgetUpcomingLabel: 'Показывать задачи на следующие дни',
+                widgetUpcoming0: 'Не показывать', widgetUpcoming1: '1 день',
+                widgetUpcoming3: '3 дня', widgetUpcoming7: '7 дней',
+                widgetTodayFirstLabel: 'Сначала задачи на сегодня',
+                widgetTodayFirstHint: 'закреплённые обычно сверху; включите, чтобы сегодняшние стояли выше закреплённых',
                 theme: 'Тема оформления',
                 themeSystem: 'Системная', themeLight: 'Светлая', themeDark: 'Тёмная',
                 completedRetention: 'Хранить выполненные задачи', trashRetention: 'Хранить задачи в корзине',
                 taskFontSize: 'Размер шрифта в задачах',
-                relativeTime: 'Относительное время',
-                relativeTimeHint: '«5 мин назад» вместо «7 окт, 15:30»',
                 searchWhileTypingLabel: 'Поиск из окна новой задачи',
                 searchWhileTypingHint: 'Набор текста ищет по списку; выбранная цветная метка фильтрует сразу, повторный клик по ней снимает фильтр',
-                newTasks: 'Новые задачи без дедлайна', toBottom: 'в конец', toTop: 'в начало',
+                newTasks: 'Новые задачи без дедлайна', newTaskBottom: 'в конец', newTaskTop: 'в начало',
                 backup: 'Резервное копирование', exportBtn: 'Экспорт', importBtn: 'Импорт',
                 deleteAll: 'Удалить все данные', deleteAllHint: 'Задачи, корзина и настройки будут стёрты',
                 cancel: 'Отмена', proceed: 'Продолжить', ok: 'OK', close: 'Закрыть',
@@ -2749,14 +2922,14 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
                 selectAll: 'Выделить всё', deselect: 'Снять выделение', copy: 'Копировать', copyAll: 'Копировать всё', copySelection: 'Копировать выделенное', paste: 'Вставить', pasteDenied: 'Нет доступа к буферу — разрешите или нажмите Ctrl+V', pasteEmpty: 'В буфере нет текста',
                 phoneRemindDeadlines: 'Напоминания о дедлайнах', phoneRemindDeadlinesHint: 'Уведомление на телефоне за указанное число минут до срока (работает и при закрытом приложении)',
                 phoneRemindRepeats: 'Напоминания о повторах', phoneRemindRepeatsHint: 'Уведомление на телефоне за указанное число минут до слота повторяющейся задачи',
-                phoneSectionLabel: 'Разрешения Android', phoneSectionHint: 'напоминания приходят и при закрытом приложении; если пуш не пришёл — проверьте, что уведомления разрешены и батарея не ограничивает приложение', phoneNotifBtn: 'Уведомления', phoneBatteryBtn: 'Батарея: без ограничений',
+                phoneSectionLabel: 'Разрешения Android', phoneSectionHint: 'напоминания приходят и при закрытом приложении; если пуш не пришёл — проверьте, что уведомления разрешены и батарея не ограничивает приложение', phoneNotifBtn: 'Уведомления', phoneBatteryBtn: 'Батарея: без ограничений', phoneBatteryOk: 'Батарея: без ограничений ✓', phoneBatteryLimited: 'Батарея: ограничена — приложение может засыпать',
                 cancelEditWarn: 'Изменения удалятся через:',
                 taskInfo: 'Информация о задаче',
                 clearAll: 'Очистить всё', clearSelection: 'Стереть выделенное',
                 finish: 'Завершить',
                 addTask: 'Добавить задачу',
                 storageError: 'Не удалось сохранить данные: хранилище недоступно или переполнено. Последние изменения могут не сохраниться.',
-                search: 'Поиск', searchPlaceholder: 'Поиск по задачам…', searchNoResults: 'Ничего не найдено',
+                search: 'Поиск', searchPlaceholder: 'Поиск по задачам…', searchNoResults: 'Ничего не найдено', resetFilters: 'Сбросить фильтры',
                 searchClear: 'Очистить', searchClose: 'Закрыть поиск',
                 searchClearClose: 'Очистить и закрыть',
                 repeatTitle: 'Повторение',
@@ -2767,9 +2940,9 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
                 hourAgoShort: 'ч.', minAgoShort: 'мин.', atPreposition: 'в',
                 lastConfirm: 'Последнее подтверждение', missedLabel: 'Пропущено:', missedShort: 'пропущено',
                 timeOne: 'раз', timeFew: 'раза', timeMany: 'раз',
-                autoConfirm: 'Автоматически подтверждать напоминания',
+                autoConfirm: 'Автоподтверждение напоминаний',
                 autoConfirmHint: 'по наступлении срока переносить на следующую дату',
-                autoConfirmOff: 'Выключено', autoConfirmOnTime: 'По наступлении времени',
+                autoConfirmOff: 'Выключено', autoConfirmOnTime: 'В момент срока',
                 autoConfirmEndOfDay: 'В конце дня',
                 calRowsLess: 'Меньше строк', calRowsMore: 'Больше строк', calFutureRepeats: 'Будущие повторы в календаре',
                 viewList: 'Список', viewCalendar: 'Календарь',
@@ -2802,10 +2975,7 @@ const settingPhoneRemindRepeatsMin = document.getElementById('settingPhoneRemind
                 syncVerifyBtn: 'Отправить письмо подтверждения',
                 syncVerifySent: 'Письмо подтверждения отправлено',
                 syncVerifyHint: 'подтвердите email по ссылке из письма',
-                syncErrNoUser: 'Аккаунт с таким email не найден',
-                syncOverwriteWarning: 'На сервере этого аккаунта уже есть данные. Локальные задачи и настройки будут заменены данными с сервера.',
                 syncLoginCancelled: 'Вход отменён — локальные данные сохранены',
-                syncUnsyncedWarn: 'На устройстве есть правки, которые не успели отправиться в облако (последняя — в {{time}}). «OK» — отправить их в облако (заменит данные облака), «Отмена» — загрузить данные из облака (эти правки пропадут).',
                 syncConnError: 'Ошибка связи с облаком — переподключение...',
                 syncShowPassword: 'Показать пароль', syncHidePassword: 'Скрыть пароль',
                 restoreToActive: 'В активные задачи', restoreToCompleted: 'В выполненные задачи', deleteForever: 'Удалить навсегда',
@@ -2871,15 +3041,23 @@ hideFarTasksHint: 'Задачи с дедлайном дальше указан�
                 deadlinePast: '⚠ Deadline cannot be in the past',
                 remove: 'Delete', save: 'Save',
                 settingsTitle: 'Settings', langLabel: 'Language',
+                widgetEmpty: 'No tasks for today',
+                widgetIdle: 'No pinned tasks or tasks for today',
+                settingsSectionLook: 'Look', settingsSectionBehavior: 'Behavior',
+                settingsSectionReminders: 'Reminders', settingsSectionData: 'Data',
+                settingsSectionWidget: 'Widget',
+                widgetUpcomingLabel: 'Show tasks for upcoming days',
+                widgetUpcoming0: 'Off', widgetUpcoming1: '1 day',
+                widgetUpcoming3: '3 days', widgetUpcoming7: '7 days',
+                widgetTodayFirstLabel: 'Today tasks first',
+                widgetTodayFirstHint: 'pinned usually go first; enable to put today\'s tasks above pinned',
                 theme: 'Theme',
                 themeSystem: 'System', themeLight: 'Light', themeDark: 'Dark',
                 completedRetention: 'Keep completed tasks', trashRetention: 'Keep tasks in trash',
                 taskFontSize: 'Task font size',
-                relativeTime: 'Relative time',
-                relativeTimeHint: '"5 min ago" instead of "Oct 7, 15:30"',
                 searchWhileTypingLabel: 'Search from the new-task box',
                 searchWhileTypingHint: 'Typing searches the list; a picked color label filters at once, clicking it again clears the filter',
-                newTasks: 'New tasks without deadline', toBottom: 'at the end', toTop: 'at the top',
+                newTasks: 'New tasks without deadline', newTaskBottom: 'at the end', newTaskTop: 'at the top',
                 backup: 'Backup', exportBtn: 'Export', importBtn: 'Import',
                 deleteAll: 'Delete all data', deleteAllHint: 'Tasks, trash and settings will be erased',
                 cancel: 'Cancel', proceed: 'Continue', ok: 'OK', close: 'Close',
@@ -2887,14 +3065,14 @@ hideFarTasksHint: 'Задачи с дедлайном дальше указан�
                 selectAll: 'Select all', deselect: 'Deselect', copy: 'Copy', copyAll: 'Copy all', copySelection: 'Copy selection', paste: 'Paste', pasteDenied: 'No clipboard access — allow it or press Ctrl+V', pasteEmpty: 'No text in the clipboard',
                 phoneRemindDeadlines: 'Deadline reminders', phoneRemindDeadlinesHint: 'Phone notification the set number of minutes before the due time (works with the app closed)',
                 phoneRemindRepeats: 'Repeat reminders', phoneRemindRepeatsHint: 'Phone notification the set number of minutes before a repeat slot',
-                phoneSectionLabel: 'Android permissions', phoneSectionHint: 'reminders arrive even when the app is closed; if a push did not arrive — check that notifications are allowed and the battery is not restricting the app', phoneNotifBtn: 'Notifications', phoneBatteryBtn: 'Battery: unrestricted',
+                phoneSectionLabel: 'Android permissions', phoneSectionHint: 'reminders arrive even when the app is closed; if a push did not arrive — check that notifications are allowed and the battery is not restricting the app', phoneNotifBtn: 'Notifications', phoneBatteryBtn: 'Battery: unrestricted', phoneBatteryOk: 'Battery: unrestricted ✓', phoneBatteryLimited: 'Battery: restricted — the app may sleep',
                 cancelEditWarn: 'Changes will be deleted in:',
                 taskInfo: 'Task info',
                 clearAll: 'Clear all', clearSelection: 'Delete selection',
                 finish: 'Finish',
                 addTask: 'Add task',
                 storageError: 'Failed to save data: storage is unavailable or full. Recent changes may not be saved.',
-                search: 'Search', searchPlaceholder: 'Search tasks…', searchNoResults: 'No matching tasks',
+                search: 'Search', searchPlaceholder: 'Search tasks…', searchNoResults: 'No matching tasks', resetFilters: 'Reset filters',
                 searchClear: 'Clear', searchClose: 'Close search',
                 searchClearClose: 'Clear and close',
                 repeatTitle: 'Repeat',
@@ -2940,10 +3118,7 @@ hideFarTasksHint: 'Задачи с дедлайном дальше указан�
                 syncVerifyBtn: 'Send verification email',
                 syncVerifySent: 'Verification email sent',
                 syncVerifyHint: 'confirm your email via the link in the letter',
-                syncErrNoUser: 'No account with this email',
-                syncOverwriteWarning: 'This account already has data on the server. Your local tasks and settings will be replaced with the server data.',
                 syncLoginCancelled: 'Sign-in cancelled — local data kept',
-                syncUnsyncedWarn: 'This device has changes that were not sent to the cloud (last one at {{time}}). "OK" sends them to the cloud (replaces cloud data), "Cancel" loads data from the cloud (these changes will be lost).',
                 syncConnError: 'Cloud connection error — reconnecting...',
                 syncShowPassword: 'Show password', syncHidePassword: 'Hide password',
                 restoreToActive: 'To active tasks', restoreToCompleted: 'To completed tasks', deleteForever: 'Delete forever',
@@ -3017,7 +3192,6 @@ hideFarTasksHint: 'Tasks with deadlines further than the set number of days are 
         const defaultSettings = {
             completedRetentionDays: 7,
             trashRetentionDays: 30,
-            useRelativeTime: true,
             newTaskOnTop: false,
             searchWhileTyping: true,
             language: (navigator.language || 'ru').startsWith('ru') ? 'ru' : 'en',
@@ -3035,10 +3209,19 @@ theme: 'system',
             calRows: 3,
             showFutureRepeats: true,
             pinnedOrder: [],
+            // ручной порядок задач без дедлайна (1.10.11): при модели
+            // «задача = документ» порядок массива myTasks в облако не
+            // передаётся — без этого перетаскиванный порядок расходился
+            // между устройствами; синхронизируется settings-документом
+            noDeadlineOrder: [],
             phoneRemindDeadlines: true,
             phoneRemindDeadlinesMin: 10,
             phoneRemindRepeats: true,
-            phoneRemindRepeatsMin: 10
+            phoneRemindRepeatsMin: 10,
+            // виджет рабочего стола (1.12.0): локальные настройки устройства,
+            // в облако не уходят (cloudSettingsForCloud), как тема/напоминания
+            widgetUpcomingDays: 3,
+            widgetTodayFirst: false
 };
         let appSettings = { ...defaultSettings };
 
@@ -3096,6 +3279,10 @@ theme: 'system',
             return [li]; // карточки вне активных списков (выполненные, корзина) всегда одна
         }
 
+        // идущие отсчёты scheduleMove: уход страницы в фон довершает их
+        // немедленно (см. слушатель visibilitychange ниже)
+        const activeMoves = new Set();
+
         function scheduleMove(li, icon, message, performMove) {
             const instances = getTaskInstances(li);
             if (instances.some(el => el.classList.contains('pending-move'))) return;
@@ -3112,23 +3299,43 @@ theme: 'system',
                 overlays.forEach(o => o.remove());
                 instances.forEach(el => el.classList.remove('pending-move'));
             };
+            // finish: то же, что истечение отсчёта. Идемпотентность через
+            // удаление из activeMoves — довершение в фоне зовёт его же
+            const finish = () => {
+                activeMoves.delete(finish);
+                clearInterval(interval);
+                stopCountdown();
+                performMove();
+            };
+            activeMoves.add(finish);
             const interval = setInterval(() => {
                 secondsLeft--;
                 overlays.forEach(o => { o.querySelector('.overlay-timer').textContent = secondsLeft; });
-                if (secondsLeft <= 0) {
-                    clearInterval(interval);
-                    stopCountdown();
-                    performMove();
-                }
+                if (secondsLeft <= 0) finish();
             }, 1000);
             overlays.forEach(overlay => {
                 overlay.querySelector('.overlay-cancel').addEventListener('click', function(e) {
                     e.stopPropagation();
+                    activeMoves.delete(finish);
                     clearInterval(interval);
                     stopCountdown();
                 });
             });
         }
+
+        // WebView в фоне ставит таймеры на паузу (MainActivity.onPause →
+        // webView.onPause): удаление/выполнение с 3с отсчётом не доезжало до
+        // сохранения и виджета, пока приложение снова не откроют — пользователь
+        // уходил на рабочий стол смотреть виджет и видел прежний состав.
+        // Отсчёт — «окно отмены»: уход из приложения = решение принято,
+        // довершаем всё идущее сразу и синхронно (по образцу flush-on-hide
+        // синхронизации)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'hidden') return;
+            activeMoves.forEach(finish => {
+                try { finish(); } catch (e) { console.error('pending move flush:', e); }
+            });
+        });
 
         // рамка выбранного дня перерисовывается только по событиям, поэтому
         // пока карточка схлопывается (removing, 0.4с), она должна следовать
@@ -3178,7 +3385,7 @@ theme: 'system',
             const clones = getTaskInstances(li).filter(x => x !== li);
             clones.forEach(c => { pinRemovingHeight(c); c.classList.add('removing'); });
             const stopTrack = trackDayFrameWhileRemoving(li);
-            setTimeout(() => {
+            const finish = () => {
                 if (stopTrack) stopTrack();
                 const wasInDeadline = deadlineList.contains(li);
                 clones.forEach(c => c.remove());
@@ -3188,10 +3395,18 @@ theme: 'system',
                 targetList.appendChild(li);
                 li.classList.remove('removing');
                 li.style.maxHeight = '';
-                li.classList.add('appearing');
-                setTimeout(() => li.classList.remove('appearing'), 1500);
+                // в скрытой странице 1500мс-таймер не тикает — класс appearing
+                // висел бы до первого тика после возврата: не добавляем
+                if (!document.hidden) {
+                    li.classList.add('appearing');
+                    setTimeout(() => li.classList.remove('appearing'), 1500);
+                }
                 if (afterMove) afterMove();
-            }, 400);
+            };
+            // скрытая страница: таймеры стоят (WebView.onPause) — довершаем
+            // синхронно, иначе сохранение/виджет не дождутся
+            if (document.hidden) { finish(); return; }
+            setTimeout(finish, 400);
         }
 
         function animateRemove(li, afterRemove) {
@@ -3200,14 +3415,18 @@ theme: 'system',
             const clones = getTaskInstances(li).filter(x => x !== li);
             clones.forEach(c => { pinRemovingHeight(c); c.classList.add('removing'); });
             const stopTrack = trackDayFrameWhileRemoving(li);
-            setTimeout(() => {
+            const finish = () => {
                 if (stopTrack) stopTrack();
                 const wasInDeadline = deadlineList.contains(li);
                 clones.forEach(c => c.remove());
                 li.remove();
                 if (wasInDeadline) calendarCloseIfSelectedDayEmpty();
                 if (afterRemove) afterRemove();
-            }, 400);
+            };
+            // скрытая страница: таймеры стоят (WebView.onPause) — довершаем
+            // синхронно, иначе сохранение/виджет не дождутся
+            if (document.hidden) { finish(); return; }
+            setTimeout(finish, 400);
         }
 
         // показать новое место задачи: карточка — по середине экрана, где
@@ -3257,6 +3476,16 @@ theme: 'system',
         let highlightLastResize = 0;    // ресайз клавиатуры — клампы скролла
         window.addEventListener('resize', function() { highlightLastResize = Date.now(); }, true);
         function armTaskHighlight(li) {
+            // задача попала за горизонт «Дальше» при свернутой секции:
+            // развернуть её, иначе красная точка на скрытой карточке
+            // не видна (1.10.25, просьба «разворачивать список и
+            // подсвечивать»). isFarTask читает НОВЫЙ дедлайн с карточки;
+            // в addTask карточка ещё лежит в taskList (в deadlineList её
+            // перенесёт sortTasks ПОСЛЕ arm) — контейнер здесь не проверять
+            if (!farSectionOpen && isFarTask(li)) {
+                farSectionOpen = true;
+                applyFarSectionState();
+            }
             li.classList.add('highlight-hold');
             heldHighlights.add(li);
             if (highlightFadeArmed) return;
@@ -3264,6 +3493,14 @@ theme: 'system',
             const fade = function(ev) {
                 if (ev && ev.type === 'keydown' &&
                     (ev.isComposing || ev.keyCode === 229 || ev.key === 'Unidentified')) return;
+                // набор следующей задачи — не «действие» для точки (1.10.12,
+                // жалоба «точка гаснет без действия»: на ПК буквы дают
+                // настоящие keydown, на телефоне — composition 229, поэтому
+                // поведение различалось). Работа в панели создания — текст,
+                // палитра, «+» — подсветку не гасит
+                if (ev && ev.type === 'keydown' && ev.target === taskInput) return;
+                if (ev && ev.type === 'pointerdown' &&
+                    ev.target && ev.target.closest && ev.target.closest('.input-container')) return;
                 if (ev && ev.type === 'scroll' &&
                     (Date.now() < highlightScrollGrace || Date.now() - highlightLastResize < 400)) return;
                 highlightFadeArmed = false;
@@ -4223,7 +4460,10 @@ theme: 'system',
         }
 
         function updateNewTaskPositionBtn() {
-            newTaskPositionBtn.textContent = settingNewTaskOnTop.checked ? t('toTop') : t('toBottom');
+            // отдельные ключи newTaskTop/newTaskBottom: общий toTop/toBottom
+            // перекрывался поздним определением для кнопки полоски чипов
+            // («Наверх»/«Вниз») — позиционная кнопка показывала не то (1.10.23)
+            newTaskPositionBtn.textContent = settingNewTaskOnTop.checked ? t('newTaskTop') : t('newTaskBottom');
         }
 
         function formatDaysCount(n) {
@@ -4288,6 +4528,7 @@ theme: 'system',
             updateSearchClearIcon();
             setIconLabel(searchClearBtn, t('searchClearClose'));
             searchEmptyMsg.textContent = t('searchNoResults');
+            resetFiltersBtn.textContent = t('resetFilters');
             completedSearchInput.placeholder = t('searchPlaceholder');
             setIconLabel(completedSearchClearBtn, t('searchClear'));
             completedSearchEmptyMsg.textContent = t('searchNoResults');
@@ -4328,6 +4569,8 @@ theme: 'system',
             document.getElementById('phoneSectionHint').textContent = t('phoneSectionHint');
             document.getElementById('phoneNotifBtn').textContent = t('phoneNotifBtn');
             document.getElementById('phoneBatteryBtn').textContent = t('phoneBatteryBtn');
+            // статус батареи — по текущему состоянию, а не по словарю
+            updateBatteryStatus();
         setIconLabel(document.getElementById('calRowsMinus'), t('calRowsLess'));
         document.getElementById('calFutureRepeats').setAttribute('aria-label', t('calFutureRepeats'));
         setIconLabel(document.getElementById('calRowsPlus'), t('calRowsMore'));
@@ -4379,6 +4622,21 @@ theme: 'system',
             // в dataset.key, переводится и при открытой модалке
             modalTitle.textContent = t(modalTitle.dataset.key || 'deadlineTitle');
             document.querySelector('#settingsModal h3').textContent = t('settingsTitle');
+            // заголовки секций окна настроек (1.10.23)
+            document.getElementById('settingsSectionLook').textContent = t('settingsSectionLook');
+            document.getElementById('settingsSectionBehavior').textContent = t('settingsSectionBehavior');
+            document.getElementById('settingsSectionReminders').textContent = t('settingsSectionReminders');
+            document.getElementById('settingsSectionData').textContent = t('settingsSectionData');
+            // секция «Виджет» (1.12.0) — скрыта в браузере, тексты всё равно
+            // обновляем: в APK секция показывается проверкой моста
+            document.getElementById('settingsSectionWidget').textContent = t('settingsSectionWidget');
+            document.getElementById('widgetUpcomingLabel').textContent = t('widgetUpcomingLabel');
+            document.getElementById('widgetUpcoming0').textContent = t('widgetUpcoming0');
+            document.getElementById('widgetUpcoming1').textContent = t('widgetUpcoming1');
+            document.getElementById('widgetUpcoming3').textContent = t('widgetUpcoming3');
+            document.getElementById('widgetUpcoming7').textContent = t('widgetUpcoming7');
+            document.getElementById('widgetTodayFirstLabel').textContent = t('widgetTodayFirstLabel');
+            document.getElementById('widgetTodayFirstHint').textContent = t('widgetTodayFirstHint');
             document.querySelector('#completedModal h3').innerHTML = `${t('completedTitle')} (<span id="completedModalCount">${completedList.children.length}</span>)`;
             document.querySelector('#trashModal h3').innerHTML = `${t('trashTitle')} (<span id="trashModalCount">${trashTasks.length}</span>)`;
             document.querySelector('label[for="settingLanguage"]').textContent = t('langLabel');
@@ -4399,8 +4657,6 @@ theme: 'system',
             document.getElementById('hideFarRemindersHint').textContent = t('hideFarRemindersHint');
             document.getElementById('hideFarTasksLabel').textContent = t('hideFarTasksLabel');
             document.getElementById('hideFarTasksHint').textContent = t('hideFarTasksHint');
-            document.querySelector('label[for="settingRelativeTime"]').textContent = t('relativeTime');
-            document.getElementById('relativeTimeHint').textContent = t('relativeTimeHint');
             document.getElementById('searchWhileTypingLabel').textContent = t('searchWhileTypingLabel');
             document.getElementById('searchWhileTypingHint').textContent = t('searchWhileTypingHint');
             document.getElementById('newTasksLabel').textContent = t('newTasks');
@@ -4439,6 +4695,9 @@ theme: 'system',
             updateEmptyMsg();
             updatePendingDeadlineButton();
             checkDeadlineAlerts();
+            // заголовки виджета живут в снимке — при смене языка пушим заново
+            // (в браузере моста нет — тихий выход)
+            sendWidgetData();
         }
 
 
@@ -4480,10 +4739,11 @@ theme: 'system',
                 if (s) {
                     const parsed = JSON.parse(s);
                     // миграция: ограничение длины задачи больше не настраивается
-                    // (потолок 5000 зашит), а сворачивание длинных задач теперь
-                    // включено по умолчанию — старый saved false сбрасываем
+                    // (потолок 5000 зашит)
                     delete parsed.maxTaskLength;
-                    delete parsed.collapseActiveTasks;
+                    // ВНИМАНИЕ: старая миграция удаляла здесь и saved
+                    // collapseActiveTasks — выбор пользователя сбрасывался при
+                    // КАЖДОЙ загрузке (1.10.23), строка удалена
                     // напоминания на телефоне: старая пара (галочка + набор интервалов)
                     // разделена на две автономные настройки — дедлайны и повторы,
                     // интервалы в свободных минутах; обе — локальные на устройстве.
@@ -4523,6 +4783,12 @@ theme: 'system',
                     const clampRemindMinutes = v => { const n = parseInt(v); return isNaN(n) ? 10 : Math.max(0, Math.min(10080, n)); };
                     appSettings.phoneRemindDeadlinesMin = clampRemindMinutes(appSettings.phoneRemindDeadlinesMin);
                     appSettings.phoneRemindRepeatsMin = clampRemindMinutes(appSettings.phoneRemindRepeatsMin);
+                    // виджет: горизонт «дальше» только из набора селекта,
+                    // чекбокс — строго булев
+                    if ([0, 1, 3, 7].indexOf(parseInt(appSettings.widgetUpcomingDays)) === -1) {
+                        appSettings.widgetUpcomingDays = 3;
+                    }
+                    appSettings.widgetTodayFirst = appSettings.widgetTodayFirst === true;
                 }
                 // пресеты дедлайна: старым настройкам засеваем набор по умолчанию,
                 // от пришедших оставляем только корректные записи
@@ -4569,6 +4835,9 @@ theme: 'system',
                     AppNative.setTheme(effectiveTheme === 'dark' ? 'dark' : 'light');
                 }
             } catch (e) {}
+            // цвета меток в виджете резолвятся в момент пуша и зависят от
+            // темы — при смене темы обновляем снимок (тихий выход в браузере)
+            sendWidgetData();
         }
 
         if (window.matchMedia) {
@@ -4590,7 +4859,6 @@ theme: 'system',
             settingHideFarTasksDays.value = appSettings.hideFarTasksDays || 14;
             updateCollapseSettingUI();
             settingTheme.value = appSettings.theme || 'system';
-            settingRelativeTime.checked = appSettings.useRelativeTime;
             settingSearchWhileTyping.checked = !!appSettings.searchWhileTyping;
             settingNewTaskOnTop.checked = appSettings.newTaskOnTop;
             settingLanguage.value = appSettings.language || 'ru';
@@ -4600,8 +4868,13 @@ theme: 'system',
             settingPhoneRemindDeadlinesMin.value = String(appSettings.phoneRemindDeadlinesMin);
             settingPhoneRemindRepeats.checked = appSettings.phoneRemindRepeats !== false;
             settingPhoneRemindRepeatsMin.value = String(appSettings.phoneRemindRepeatsMin);
+            settingWidgetUpcoming.value = String(appSettings.widgetUpcomingDays);
+            settingWidgetTodayFirst.checked = appSettings.widgetTodayFirst === true;
             settingBlockNav.value = appSettings.blockNavMode || 'floating';
             updateNewTaskPositionBtn();
+            // статус батарейного исключения на момент открытия настроек:
+            // мог измениться в системном окне после прошлого визита
+            updateBatteryStatus();
             settingsModal.classList.add('active');
             // при открытии прокрутка всегда сверху
             settingsModal.querySelector('.modal-scroll').scrollTop = 0;
@@ -4688,6 +4961,8 @@ theme: 'system',
                 // diff против тени удалит из облака все задачи и корзину,
                 // иначе применённое с другого устройства вернётся обратно
                 syncLocalDiff();
+                // виджет: пустой снимок (иначе остаётся старый)
+                sendWidgetData();
                 syncFlush();
                 setTimeout(() => location.reload(), 800);
             }
@@ -4766,6 +5041,21 @@ theme: 'system',
         // ====================================================================
         //  Инициализация приложения
         // ====================================================================
+
+        // статус батарейного исключения (1.10.10): прямой системный запрос —
+        // пустой no-op, если исключение уже дано (кнопка «Батарея» выглядела
+        // мёртвой). Мост сообщает текущее состояние; в браузере секции нет
+        // и метод не существует — тихий выход
+        function updateBatteryStatus() {
+            const el = document.getElementById('phoneBatteryStatus');
+            if (!el || !window.AppNative || typeof AppNative.isIgnoringBatteryOptimizations !== 'function') return;
+            let ok = false;
+            try { ok = AppNative.isIgnoringBatteryOptimizations() === true; } catch (e) { return; }
+            el.textContent = t(ok ? 'phoneBatteryOk' : 'phoneBatteryLimited');
+            el.style.display = '';
+            el.classList.toggle('battery-ok', ok);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             loadSettings();
             applyTheme();
@@ -4788,6 +5078,7 @@ theme: 'system',
             initStaticIcons();
             checkDeadlineAlerts();
             sendNativeReminders();
+            sendWidgetData();
             autoResizeTextarea();
             inputLastText = taskInput.value;
             updateAddButton();
@@ -4805,6 +5096,27 @@ theme: 'system',
                 });
                 document.getElementById('phoneBatteryBtn').addEventListener('click', function() {
                     try { AppNative.openBatterySettings(); } catch (e) {}
+                    // статус обновится после возврата из системного окна:
+                    // таймер заморожен, пока активность за диалогом, и
+                    // сработает сразу после onResume
+                    setTimeout(updateBatteryStatus, 1500);
+                });
+                updateBatteryStatus();
+                // настройки виджета рабочего стола (1.12.0) — тоже только
+                // в обёртке: в браузере виджета нет
+                document.getElementById('settingsSectionWidget').style.display = '';
+                document.getElementById('widgetUpcomingGroup').style.display = '';
+                document.getElementById('widgetTodayFirstGroup').style.display = '';
+                document.getElementById('settingWidgetUpcoming').addEventListener('change', function() {
+                    const n = parseInt(this.value);
+                    appSettings.widgetUpcomingDays = [0, 1, 3, 7].includes(n) ? n : 3;
+                    saveSettings();
+                    sendWidgetData();
+                });
+                document.getElementById('settingWidgetTodayFirst').addEventListener('change', function() {
+                    appSettings.widgetTodayFirst = this.checked === true;
+                    saveSettings();
+                    sendWidgetData();
                 });
             }
         });
@@ -5150,8 +5462,10 @@ theme: 'system',
                 updateCollapseState();
             }
         });
-        // клик по подписи или значению переключает чекбокс сворачивания
-        document.querySelector('.collapse-setting').addEventListener('click', function(e) {
+        // клик по подписи или значению переключает чекбокс сворачивания;
+        // привязка через closest от чекбокса — не к ПЕРВОЙ collapse-setting
+        // в DOM (порядок групп менялся, хрупко, 1.10.23)
+        document.getElementById('settingCollapseActive').closest('.collapse-setting').addEventListener('click', function(e) {
             if (e.target === settingCollapseActive) return;
             if (e.target === settingCollapseHeight && appSettings.collapseActiveTasks) return;
             e.preventDefault();
@@ -5248,12 +5562,6 @@ theme: 'system',
             syncPassToggle.innerHTML = show ? EYE_OFF_SVG : EYE_SVG;
             setIconLabel(syncPassToggle, t(show ? 'syncHidePassword' : 'syncShowPassword'));
             syncPasswordInput.focus();
-        });
-
-        settingRelativeTime.addEventListener('change', function() {
-            appSettings.useRelativeTime = this.checked;
-            saveSettings();
-            refreshAllDates();
         });
 
         settingNewTaskOnTop.addEventListener('change', function() {
@@ -5779,10 +6087,10 @@ theme: 'system',
         // остаётся на своём месте и в середине списка — и затыкала прокрутку
         // задолго до цели; скрытая фильтром давала rect из нулей и лимит
         // срабатывал всегда
-        function upperDragScrollLimitReached() {
-            // допуск 1px: у верхней границы сырые значения бывают дробными
-            return noDeadlinePanel.getBoundingClientRect().top >= -1;
-        }
+        // upperDragScrollLimitReached удалён (1.10.15): лимит автопрокрутки
+        // вверх проверялся только в dragover (RAF между событиями проскакивал
+        // его), оставляя мёртвую зону и рывки; прокрутка теперь до верха
+        // страницы, scrollBy останавливается о scrollY=0 естественно
 
         // ====================================================================
         //  Вид «Календарь» активных задач: месячная сетка с точками задач,
@@ -5912,6 +6220,11 @@ theme: 'system',
             if (calWeekOffset < minOffset) calWeekOffset = minOffset;
             // «назад» неактивна (серая), когда глубже в прошлое листать некуда
             document.getElementById('calTasksPrev').disabled = calWeekOffset <= minOffset;
+            // курсор заголовка синхронизируется с доступностью ‹: окно могло
+            // сдвинуться без движения мыши (кнопки/клавиатура) — иначе рука
+            // оставалась над мёртвой половиной до первого mousemove
+            document.getElementById('calTasksTitle').style.cursor =
+                (calTitleLeftHalf === true && document.getElementById('calTasksPrev').disabled) ? 'default' : 'pointer';
             start.setDate(start.getDate() - dow - weeksBack * 7 + calWeekOffset * 7);
             calWindowStart = new Date(start);
             const end = new Date(start); end.setDate(end.getDate() + rows * 7 - 1); end.setHours(23, 59, 59, 999);
@@ -6287,20 +6600,35 @@ theme: 'system',
                 }
             }
             if (!target) { flight.ghost.remove(); return; }
-            playDotFly(flight, target);
+            playDotFly(flight, target, new Date(newDs));
         }
 
         // перелёт: длительность от расстояния (2с у соседних дней, до 3с
         // у противоположных концов окна); rAF каждый кадр читает актуальную
         // позицию цели, поэтому анимация переживает прокрутку страницы.
-        // Цель может быть синтетической (точки нет в кадре) — isFake
-        function playDotFly(flight, targetDot) {
+        // Цель может быть синтетической (точки нет в кадре) — isFake.
+        // ПЕРЕРИСОВКА календаря в первые секунды полёта отцепляла целевую
+        // точку: `document.contains` становился false, призрак замирал на
+        // старте, а точка уже стояла в новом дне — «полёт начинается,
+        // затыкается и резко перескакивает» (1.10.24). Теперь каждый кадр
+        // проверяет живость цели и ПЕРЕИЩЕТ её по дню в свежем гриде
+        function playDotFly(flight, targetDot, nd) {
             const ghost = flight.ghost;
             const startX = flight.from.left, startY = flight.from.top;
             const dur = flight.dur || 2000;
             const t0 = performance.now();
-            const real = !targetDot.isFake;
+            let real = !targetDot.isFake;
             if (real) targetDot.style.visibility = 'hidden';
+            const refind = () => {
+                if (document.contains(targetDot)) return targetDot;
+                if (!nd || isNaN(nd.getTime())) return null;
+                const cell = findCalendarCell(nd);
+                if (!cell) return null;
+                const d = pickCellDot(cell, flight.color, flight.isRepeat);
+                if (d) { d.style.visibility = 'hidden'; return d; }
+                const rr = synthesizedDotRect(cell);
+                return { isFake: true, getBoundingClientRect: () => ({ left: rr.left, top: rr.top, width: rr.width, height: rr.height }) };
+            };
             const finish = () => {
                 if (real && document.contains(targetDot)) targetDot.style.visibility = '';
                 if (document.contains(ghost)) ghost.remove();
@@ -6308,8 +6636,15 @@ theme: 'system',
             function frame(now) {
                 const p = Math.min(1, (now - t0) / dur);
                 const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
-                // цель стёрта перерисовкой — призрак замирает на последней позиции
-                if (!real || document.contains(targetDot)) {
+                const cur = refind();
+                if (cur) {
+                    if (cur !== targetDot) {
+                        // цель сменилась перерисовкой: старую (если вдруг жива)
+                        // вернуть видимой, новой — спрятать на время полёта
+                        if (real && document.contains(targetDot)) targetDot.style.visibility = '';
+                        targetDot = cur;
+                        real = !cur.isFake;
+                    }
                     const tr = targetDot.getBoundingClientRect();
                     ghost.style.transform = 'translate(' + Math.round((tr.left - startX) * e) + 'px,' + Math.round((tr.top - startY) * e) + 'px)';
                 }
@@ -6387,8 +6722,14 @@ theme: 'system',
                     const left = e.clientX - r.left < r.width / 2;
                     calTitlePrev.classList.toggle('sim-hover', left && !calTitlePrev.disabled);
                     calTitleNext.classList.toggle('sim-hover', !left && !calTitleNext.disabled);
+                    // курсор отражает доступность направления: назад некуда —
+                    // левая половина не кликабельна, рука вводит в заблуждение
+                    // (1.10.26, скриншот с рукой над «16 нояб.» при неактивной ‹)
+                    calTitleLeftHalf = left;
+                    calTitle.style.cursor = (left && calTitlePrev.disabled) ? 'default' : 'pointer';
                 });
                 calTitle.addEventListener('mouseleave', () => {
+                    calTitleLeftHalf = null;
                     calTitlePrev.classList.remove('sim-hover');
                     calTitleNext.classList.remove('sim-hover');
                 });
@@ -6518,12 +6859,16 @@ theme: 'system',
 
                 const liRect = li.getBoundingClientRect();
                 const relX = e.clientX - liRect.left;
-                const clickedInsideInteractiveArea = e.target.closest(
-                    '.task-text, .task-actions, .drag-handle, .auto-sort-icon, .task-color-picker, .deadline-display'
+                // зона метки перекрывает первые 6px ТЕКСТА и ПЛАШКИ дедлайна
+                // (1.10.28, «толстым пальцем все равно не нажать»): клики по
+                // ним в зоне открывают палитру. Жёстко-интерактивное (кнопки
+                // строки действий, ручка, открытый пикер) зону не перекрывает
+                const clickedHardInteractive = e.target.closest(
+                    '.task-actions, .drag-handle, .auto-sort-icon, .task-color-picker'
                 );
                 if (
                     !li.classList.contains('completed') &&
-                    !clickedInsideInteractiveArea &&
+                    !clickedHardInteractive &&
                     relX >= LABEL_ZONE_X_MIN &&
                     relX < labelZoneMax(li)
                 ) {
@@ -6734,26 +7079,29 @@ theme: 'system',
                     return;
                 }
                 if (!draggedElement) return;
-                const elementUnderCursor = document.elementFromPoint(e.clientX, e.clientY);
-                const blockedLi = elementUnderCursor ? elementUnderCursor.closest('li') : null;
-                // сама перетаскиваемая карточка не блокирует; закреплённые карточки
-                // теперь обычные участники списка «без дедлайна» — их можно
-                // обкатывать при переносе и принимать бросок
-                if (blockedLi && blockedLi !== draggedElement && (blockedLi.classList.contains('sorted-task') || blockedLi.classList.contains('completed'))) {
-                    e.dataTransfer.dropEffect = 'none';
-                    setBlockedHighlight(true);
-                    updateDropIndicator(null, null);
-                    stopAutoScroll();
-                    return;
-                }
 
-                setBlockedHighlight(false);
-
+                // АВТОПРОКРУТКА У КРАЁВ — ДО проверок цели (1.10.15, жалоба
+                // «список прокручивается с затыками между задачами»): раньше
+                // запрещённая карточка (дедлайн-клон, completed) вызывала
+                // stopAutoScroll, и подкат вверх останавливался на каждой
+                // такой карте — dragover с неподвижным курсором снова
+                // попадал в неё же, и скролл ждал шевеления мышью. Теперь
+                // скролл у края идёт независимо от того, над какой
+                // карточкой курсор; запрещённая карточка лишь запрещает
+                // БРОСОК, но не прокрутку
                 const edgeThreshold = isTouchDevice ? 150 : 80;
                 const maxSpeed = isTouchDevice ? 20 : 25;
                 const minSpeed = 3;
                 const viewportHeight = window.innerHeight;
-                if (e.clientY < edgeThreshold && !upperDragScrollLimitReached()) {
+                // бывший лимит «верх панели без дедлайна у верха экрана»
+                // (upperDragScrollLimitReached) удалён (1.10.15): он
+                // проверялся только в dragover, а RAF между событиями
+                // проскакивал его на ~180px → рывок мимо границы и мёртвая
+                // зона (любой следующий dragover у края давал
+                // stopAutoScroll) — подкат вверх шёл «затыками». Теперь
+                // прокрутка вверх идёт до верха страницы (scrollBy сам
+                // упирается в 0, перелёта нет), к любым карточкам списка
+                if (e.clientY < edgeThreshold) {
                     const distance = e.clientY;
                     const normalized = 1 - (distance / edgeThreshold);
                     const speed = minSpeed + (maxSpeed - minSpeed) * (normalized * normalized);
@@ -6766,6 +7114,20 @@ theme: 'system',
                 } else {
                     stopAutoScroll();
                 }
+
+                const elementUnderCursor = document.elementFromPoint(e.clientX, e.clientY);
+                const blockedLi = elementUnderCursor ? elementUnderCursor.closest('li') : null;
+                // сама перетаскиваемая карточка не блокирует; закреплённые карточки
+                // теперь обычные участники списка «без дедлайна» — их можно
+                // обкатывать при переносе и принимать бросок
+                if (blockedLi && blockedLi !== draggedElement && (blockedLi.classList.contains('sorted-task') || blockedLi.classList.contains('completed'))) {
+                    e.dataTransfer.dropEffect = 'none';
+                    setBlockedHighlight(true);
+                    updateDropIndicator(null, null);
+                    return;
+                }
+
+                setBlockedHighlight(false);
                 const result = findTargetTask(e.clientY);
                 if (!result) { e.dataTransfer.dropEffect = 'none'; setBlockedHighlight(true); updateDropIndicator(null, null); return; }
                 e.dataTransfer.dropEffect = 'move';
@@ -6825,6 +7187,7 @@ theme: 'system',
                         });
                     });
                 });
+                rebuildNoDeadlineOrder();
                 saveTasks();
             });
             });
@@ -6972,6 +7335,21 @@ theme: 'system',
                 }
 
                 if (!li || li.classList.contains('completed') || li.querySelector('.task-text-editing')) return;
+
+                // ручка перетаскивания — drag-область целиком: без радуги
+                // (радуга обещает пикер, а клик по ручке открывать его не
+                // может), курсор у неё свой grab — иначе смешанное состояние
+                // «радуга есть, курсор grab, палитра не открывается» (1.11.15).
+                // Радугу той же li снимаем и здесь: при движении слева
+                // направо currentHoverLi === li, и ранний выход иначе
+                // оставлял радугу висеть над ручкой (1.11.16)
+                if (e.target.closest('.drag-handle')) {
+                    if (currentHoverLi === li) {
+                        li.classList.remove('label-hover');
+                        currentHoverLi = null;
+                    }
+                    return;
+                }
 
                 const liRect = li.getBoundingClientRect();
                 const relX = e.clientX - liRect.left;
@@ -7842,6 +8220,13 @@ theme: 'system',
             updateAddButton();
             updateDeadlineButtonState();
             updateCharCounter(taskInput, document.getElementById('taskInputCounter'));
+            // метка израсходована созданной задачей: палитра сбрасывается на
+            // серую, следующая задача начинается без метки; applyTypingSearch
+            // ниже снимает и фильтр набора с этой метки (если был)
+            currentNewTaskColor = null;
+            typingColorFilter = false;
+            syncPaletteSelection();
+            inputColorIndicator.style.backgroundColor = 'var(--task-color-none)';
             applyTypingSearch();
             // новая задача с дедлайном на день, отличный от выбранного в
             // календаре: выбираем день новой задачи — окно следует за выбором,
@@ -7868,6 +8253,7 @@ theme: 'system',
             pendingDeadline = null;
             pendingRepeat = null;
             updatePendingDeadlineButton();
+            rebuildNoDeadlineOrder();
             saveTasks();
             updateEmptyMsg();
             scrolledToTopOnInput = false;
@@ -8515,7 +8901,11 @@ theme: 'system',
             // search-active — признак именно ПОИСКА (текст/метка): выбранный
             // день задач без дедлайна не касается и перетаскивание не глушит
             taskList.classList.toggle('search-active', searching);
-            searchCount.textContent = searching ? shown + ' / ' + total : '';
+            // счётчик виден всегда при ОТКРЫТОМ поиске — даже без запроса и
+            // фильтров («14 / 14»), просьба пользователя (1.10.20); span
+            // скрыт вместе с закрытой строкой поиска, поэтому пустое
+            // состояние вне поиска не показывается само
+            searchCount.textContent = shown + ' / ' + total;
             syncTasksPanels();
             // точки в календаре следуют за фильтром: скрытые карточки не рисуются
             renderTasksCalendar();
@@ -8849,6 +9239,9 @@ theme: 'system',
             emptyPanel.style.display = (!searching && total === 0) || (searching && !anyVisible && !dayMessagesOwn) ? '' : 'none';
             emptyMsg.style.display = (!searching && total === 0) ? 'block' : 'none';
             searchEmptyMsg.style.display = (searching && !anyVisible && !dayMessagesOwn) ? 'block' : 'none';
+            // «Сбросить фильтры» — вместе с «Ничего не найдено»: на пустом
+            // списке без фильтров («Список пуст») кнопки нет
+            resetFiltersBtn.style.display = (searching && !anyVisible && !dayMessagesOwn) ? 'block' : 'none';
             // чипы быстрых переходов: счётчики (клоны не считаем)
             const navCounts = {
                 pinned: pinnedList.children.length,
@@ -8868,6 +9261,26 @@ theme: 'system',
             });
             applyBlockNavMode();
         }
+
+        // «Сбросить фильтры» под «Ничего не найдено» (1.10.13): очищает все
+        // источники фильтрации разом — запрос поиска, набор в поле новой
+        // задачи (он тоже фильтрует), метку и выбранный день
+        resetFiltersBtn.addEventListener('click', function() {
+            if (isTouchDevice) this.blur();
+            taskInput.value = '';
+            inputLastText = '';
+            autoResizeTextarea();
+            currentNewTaskColor = null;
+            typingColorFilter = false;
+            syncPaletteSelection();
+            inputColorIndicator.style.backgroundColor = 'var(--task-color-none)';
+            updateAddButton();
+            updateDeadlineButtonState();
+            updateCharCounter(taskInput, document.getElementById('taskInputCounter'));
+            if (searchRow.style.display !== 'none') setSearchOpen(false);
+            else applyTypingSearch();
+            if (calendarDayFilter) setCalendarFilter(null);
+        });
 
         // ===== быстрые переходы между блоками: чипы в полосках =====
         navPinned.innerHTML = PIN_ICON_SVG + '<span class="block-nav-count"></span>';
@@ -9353,33 +9766,37 @@ theme: 'system',
             const rule = repeat ? parseRepeatRule(typeof repeat === 'string' ? repeat : formatRepeatRule(repeat)) : null;
             const icon = document.createElement('span');
             icon.classList.add('deadline-icon');
-            // у повторяющейся задачи часы меняются на иконку повтора,
-            // расписание — слева от значка, относительное время — справа (< 7 дней)
+            // у повторяющейся задачи часы меняются на иконку повтора;
+            // состав данных у обоих типов одинаков (1.11.11): относительное
+            // время — СЛЕВА от значка, точное (день, время, дата) — СПРАВА
             icon.innerHTML = rule ? REPEAT_ICON_SVG : CLOCK_SVG;
             const text = document.createElement('span');
-            text.textContent = reminderChipText(ds, rule);
-            if (rule) {
-                const msLeft = new Date(ds) - new Date();
-                if (msLeft <= 0) {
-                    // наступивший слот: значок повтора перед словом «Наступило»
-                    el.appendChild(icon);
-                    el.appendChild(text);
-                } else {
-                    el.appendChild(text);
-                    el.appendChild(icon);
-                    if (msLeft <= 7 * 86400000) {
-                        const rel = document.createElement('span');
-                        rel.classList.add('deadline-relative');
-                        rel.textContent = formatDeadlineShort(new Date(ds), true);
-                        el.appendChild(rel);
-                    }
-                }
+            const rel = document.createElement('span');
+            rel.classList.add('deadline-relative');
+            const d = new Date(ds);
+            const future = d > new Date();
+            if (rule && !future) {
+                // наступивший слот повтора: состояние («Наступило …») слева,
+                // значок справа — относительное тоже слева от значка
+                text.textContent = reminderChipText(ds, rule);
+                el.appendChild(text);
+                el.appendChild(icon);
             } else {
+                // будущее: относительное (в окне недели; у просроченного
+                // обычного — «Просрочено») слева, значок, точное справа
+                text.textContent = isNaN(d.getTime()) ? '' : formatReminderChip(d);
+                const msLeft = d - new Date();
+                if (msLeft <= 7 * 86400000) {
+                    rel.textContent = formatDeadlineShort(d, !!rule);
+                } else {
+                    rel.style.display = 'none';
+                }
+                el.appendChild(rel);
                 el.appendChild(icon);
                 el.appendChild(text);
             }
             // у напоминания это не дедлайн — слово «Дедлайн» в подсказке не нужно
-            el.title = (rule ? '' : t('deadlinePrefix') + ' ') + formatFullDate(new Date(ds))
+            el.title = (rule ? '' : t('deadlinePrefix') + ' ') + formatFullDate(d)
                 + (rule ? ' · ' + t('repeatTitle') + ': ' + repeatRuleText(rule) : '');
             return el;
         }
@@ -9681,6 +10098,10 @@ theme: 'system',
             updateRepeatButtons();
             updatePickerDisplay();
             deadlineModal.classList.add('active');
+            // отступ сверху в ПИКСЕЛЯХ от текущего (до-клавиатурного)
+            // вьюпорта: клавиатура сожмёт вьюпорт, но px не пересчитается —
+            // окно не уедёт (1.10.22)
+            deadlineModal.style.paddingTop = Math.round(window.innerHeight * 0.1) + 'px';
             // рамки-дуги повторов: чипы уже видимы — размеры измеримы
             decorateRepeatFrames();
             requestAnimationFrame(() => updateYearGradient());
@@ -9694,6 +10115,7 @@ theme: 'system',
 
         function closeDeadlineModal() {
             deadlineModal.classList.remove('active');
+            deadlineModal.style.paddingTop = '';
             currentEditingTask = null;
             intendedDay = null;
             modalRepeat = null;
@@ -9752,9 +10174,12 @@ theme: 'system',
             if (oldBtn) oldBtn.remove();
 
             const dlEl = createDeadlineElement(ds, modalRepeat);
-            // у повторяющихся плашка слева (в мета-строке), у обычных — справа
-            if (modalRepeat) taskLi.querySelector('.task-meta-left').appendChild(dlEl);
-            else taskLi.querySelector('.task-actions').insertBefore(dlEl, taskLi.querySelector('.task-actions').firstChild);
+            // плашка дедлайна ВСЕГДА в мета-строке слева — как в
+            // createTaskElement (1.10.4); раньше здесь оставалась старая
+            // раскладка «у обычных — справа», и плашка после изменения
+            // времени вставала справа, а следующая пересборка списка
+            // дёргала её влево
+            taskLi.querySelector('.task-meta-left').appendChild(dlEl);
 
             // правило повтора сохраняется вместе с дедлайном
             if (modalRepeat) {
@@ -9883,27 +10308,35 @@ theme: 'system',
             document.querySelectorAll('.deadline-display').forEach(el => {
                 const host = el.closest('li');
                 const rule = host ? parseRepeatRule(host.dataset.repeat) : null;
+                const d = new Date(el.dataset.deadline);
+                const future = d > new Date();
                 const textEl = el.querySelector('span:not(.deadline-icon):not(.deadline-relative)');
-                if (!textEl) return;
-                const newText = reminderChipText(el.dataset.deadline, rule);
-                if (textEl.textContent !== newText) textEl.textContent = newText;
-                // значок повтора: перед текстом у наступившего слота,
-                // после текста (перед относительным временем) у будущего
                 const iconEl = el.querySelector('.deadline-icon');
-                if (iconEl && rule) {
-                    const due = !(new Date(el.dataset.deadline) > new Date());
-                    if (due && el.firstElementChild !== iconEl) el.insertBefore(iconEl, el.firstChild);
-                    else if (!due && el.firstElementChild === iconEl) textEl.after(iconEl);
-                }
                 const relEl = el.querySelector('.deadline-relative');
-                if (!relEl) return;
-                const msLeft = new Date(el.dataset.deadline) - new Date();
-                if (msLeft > 0 && msLeft <= 7 * 86400000) {
-                    const newText2 = formatDeadlineShort(new Date(el.dataset.deadline), true);
-                    if (relEl.textContent !== newText2) relEl.textContent = newText2;
-                    relEl.style.display = '';
+                if (!textEl || !iconEl) return;
+                if (rule && !future) {
+                    // наступивший слот повтора: состояние («Наступило …»)
+                    // слева, значок справа (мог прийти из будущего: чип
+                    // перестраивается из [rel][icon][text] в [text][icon],
+                    // rel скрывается)
+                    textEl.textContent = reminderChipText(el.dataset.deadline, rule);
+                    if (el.lastElementChild !== iconEl) el.appendChild(iconEl);
+                    if (el.firstElementChild !== textEl) el.insertBefore(textEl, el.firstChild);
+                    if (relEl) relEl.style.display = 'none';
                 } else {
-                    relEl.style.display = 'none';
+                    // будущее и просроченное обычное: относительное слева,
+                    // значок, точное справа (состав как у повторов)
+                    textEl.textContent = isNaN(d.getTime()) ? '' : formatReminderChip(d);
+                    const msLeft = d - new Date();
+                    if (relEl) {
+                        if (msLeft <= 7 * 86400000) {
+                            const nt = formatDeadlineShort(d, !!rule);
+                            if (relEl.textContent !== nt) relEl.textContent = nt;
+                            relEl.style.display = '';
+                        } else {
+                            relEl.style.display = 'none';
+                        }
+                    }
                 }
             });
         }
@@ -10034,7 +10467,108 @@ theme: 'system',
             }
             // расписание напоминаний для обёртки Android — после каждой правки
             sendNativeReminders();
+            // снимок для виджета (закреплённые / сегодня / ближайшие дни)
+            sendWidgetData();
         }
+
+        // ====================================================================
+        //  Виджет APK: снимок закреплённых, задач на сегодня и ближайших
+        //  дней (мост, как расписание напоминаний). Вызывается после каждого
+        //  saveTasks, на старте, после «Очистить все данные», при возврате в
+        //  приложение, облачной пересборке списка, смене языка и темы; в
+        //  браузере тихий выход. Виджет — RemoteViews, веб-код в него не
+        //  встраивается: страница отдаёт ЕДИНЫЙ список rows в порядке показа
+        //  (закреплённые → сегодня → следующие дни; порядок первых двух
+        //  переключает настройка), провайдер сам решает, сколько строк
+        //  влезает по высоте виджета, и пишет «+N» в последнюю строку
+        // ====================================================================
+        function sendWidgetData() {
+            if (!window.AppNative || typeof AppNative.updateWidget !== 'function') return;
+            try {
+                const tasks = JSON.parse(localStorage.getItem('myTasks') || '[]');
+                const start = new Date(); start.setHours(0, 0, 0, 0);
+                // горизонт «дальше» в днях: 0 — не показывать будущие вовсе
+                const wu = parseInt(appSettings.widgetUpcomingDays);
+                const horizon = [0, 1, 3, 7].includes(wu) ? wu : 3;
+                const todayFirst = appSettings.widgetTodayFirst === true;
+                const pinned = [], todays = [], upcoming = [];
+                const seenIds = new Set();
+                const now = Date.now();
+                tasks.forEach(t => {
+                    if (!t || t.completed || !t.text) return;
+                    // дедупликация: гонки синхронизации могли оставить в
+                    // myTasks двойника — виджет не должен его показывать
+                    if (t.id && seenIds.has(t.id)) return;
+                    if (t.id) seenIds.add(t.id);
+                    let timeStr = '';
+                    let dateStr = '';
+                    let diff = null; // дней от сегодня: 0 — сегодня, 1 — завтра
+                    let overdue = false;
+                    if (t.deadline) {
+                        const d = new Date(t.deadline);
+                        if (!isNaN(d.getTime())) {
+                            timeStr = d.toLocaleTimeString(localeStr(), { hour: '2-digit', minute: '2-digit', hour12: false });
+                            // локальная дата слота (гггг-мм-дд): провайдер по
+                            // ней отбрасывает «вчерашние» строки при системной
+                            // перерисовке после полуночи и ставит метку дня
+                            // будущим строкам
+                            dateStr = d.getFullYear() + '-' +
+                                String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                                String(d.getDate()).padStart(2, '0');
+                            diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - start) / 86400000);
+                            // просрочено сегодня — время в виджете красное
+                            overdue = diff === 0 && d.getTime() < now;
+                        }
+                    }
+                    const row = { id: t.id, text: t.text.slice(0, 200), color: t.color || 'none', time: timeStr };
+                    if (dateStr) row.date = dateStr;
+                    if (overdue) row.od = true;
+                    if (t.pinned) row.pinned = true;
+                    if (t.pinned) pinned.push(row);
+                    else if (diff === 0) todays.push(row);
+                    else if (diff !== null && diff >= 1 && diff <= horizon) upcoming.push(row);
+                });
+                // порядок закреплённых — как в панели приложения (pinnedOrder,
+                // новые наверх): порядок массива myTasks — это порядок создания.
+                // Мёртвые id (задача удалена/откреплена) из порядка вычищаем —
+                // иначе копятся бесконечно
+                const pinOrder = (typeof appSettings !== 'undefined' && appSettings.pinnedOrder) || [];
+                const pinnedIds = new Set(pinned.map(r => r.id));
+                const cleanOrder = pinOrder.filter(id => pinnedIds.has(id));
+                if (cleanOrder.length !== pinOrder.length && typeof appSettings !== 'undefined') {
+                    appSettings.pinnedOrder = cleanOrder;
+                    saveSettings();
+                }
+                const pinPos = id => { const i = cleanOrder.indexOf(id); return i === -1 ? cleanOrder.length : i; };
+                pinned.sort((a, b) => pinPos(a.id) - pinPos(b.id));
+                todays.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
+                upcoming.sort((a, b) => ((a.date || '') + ' ' + (a.time || '99:99')).localeCompare((b.date || '') + ' ' + (b.time || '99:99')));
+                const rows = todayFirst ? todays.concat(pinned, upcoming) : pinned.concat(todays, upcoming);
+                const colors = {};
+                ['none', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'black'].forEach(c => {
+                    colors[c] = getComputedStyle(document.documentElement).getPropertyValue('--task-color-' + c).trim();
+                });
+                // пустой виджет: задач нет вообще — «Нет задач на сегодня»;
+                // активные есть, но в rows ничего не попало — свой текст
+                const hasActive = tasks.some(x => x && !x.completed);
+                // список идёт ЦЕЛИКОМ: провайдер сам показывает столько строк,
+                // сколько влезает по высоте виджета, и считает «+N» — по факту
+                window.AppNative.updateWidget(JSON.stringify({
+                    rows: rows,
+                    empty: !hasActive ? t('widgetEmpty') : (rows.length ? '' : t('widgetIdle')),
+                    // запасной текст, если список опустел ПОСЛЕ пуша
+                    // (полуночный фильтр дат в провайдере)
+                    idle: t('widgetIdle'),
+                    colors: colors
+                }));
+            } catch (e) { console.error('sendWidgetData:', e); }
+        }
+
+        // виджет: перезаполнять снимок при каждом открытии/возврате в
+        // приложение — виджет мог быть добавлен до первого запуска
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') sendWidgetData();
+        });
 
         // ====================================================================
         //  Нативные напоминания (мост в обёртку APK). Приложение само не умеет
@@ -10281,12 +10815,77 @@ theme: 'system',
             }
         });
 
+        // ====================================================================
+        //  Порядок задач без дедлайна (1.10.11): при модели «задача =
+        //  документ» порядок массива myTasks в облако не передаётся —
+        //  вручную перетасканный порядок стоял по-разному на устройствах.
+        //  Порядок живёт в appSettings.noDeadlineOrder (id-массив, как
+        //  pinnedOrder у закреплённых) и уезжает в settings-документ.
+        //  ПРИМЕНЕНИЕ — applyNoDeadlineOrder в loadTasks (облачные и
+        //  локальные изменения списка переупорядочиваются одинаково);
+        //  ЗАПИСЬ — rebuildNoDeadlineOrder из DOM в локальных мутациях
+        //  (перетаскивание, новая задача). Мусорные id (задача удалена,
+        //  получила дедлайн или выполнена) вычищаются при применении —
+        //  потерявшая дедлайн задача возвращается в конец, восстановленная
+        //  из корзины добавляется в конец, как и раньше
+        // ====================================================================
+        function applyNoDeadlineOrder(tasks) {
+            const order = Array.isArray(appSettings.noDeadlineOrder) ? appSettings.noDeadlineOrder.slice() : [];
+            if (!order.length) return tasks;
+            const pos = new Map();
+            order.forEach((id, i) => { if (!pos.has(id)) pos.set(id, i); });
+            const hasDl = t => t && t.deadline !== null;
+            const byId = new Map();
+            tasks.forEach(t => { if (t && t.id) byId.set(t.id, t); });
+            const pruned = order.filter(id => {
+                const t = byId.get(id);
+                return t && !t.completed && !hasDl(t);
+            });
+            if (pruned.length !== order.length) {
+                appSettings.noDeadlineOrder = pruned;
+                try { localStorage.setItem('appSettings', JSON.stringify(appSettings)); } catch (e) {}
+            }
+            const dl = [], known = [], unknown = [];
+            tasks.forEach(t => {
+                if (!t) return;
+                if (t.completed || hasDl(t)) dl.push(t);
+                else if (pos.has(t.id)) known.push(t);
+                else unknown.push(t);
+            });
+            known.sort((a, b) => pos.get(a.id) - pos.get(b.id));
+            return dl.concat(known, unknown);
+        }
+
+        // порядок из текущего DOM блока «без дедлайна»; вызывается ТОЛЬКО в
+        // локальных мутациях — облачные изменения порядка применяются через
+        // applyNoDeadlineOrder в loadTasks и DOM не перезаписывают
+        function rebuildNoDeadlineOrder() {
+            const ids = Array.from(taskList.children)
+                .filter(li => !li.classList.contains('clone-task'))
+                .map(li => li.dataset.id || '')
+                .filter(Boolean);
+            const prev = Array.isArray(appSettings.noDeadlineOrder) ? appSettings.noDeadlineOrder : [];
+            if (prev.length === ids.length && prev.every((id, i) => id === ids[i])) return;
+            appSettings.noDeadlineOrder = ids;
+            saveSettings();
+        }
+
         function loadTasks() {
             try {
                 const s = localStorage.getItem('myTasks');
                 if (!s) return;
                 const tasks = JSON.parse(s);
                 if (!Array.isArray(tasks)) throw new Error('Invalid data format');
+                // подсветка новых задач переживает пересборку: облачное
+                // изменение / первый pull заменяют карточки — без этого
+                // точка гасла мгновенно, без действий пользователя
+                const heldIds = [];
+                if (heldHighlights.size) {
+                    heldHighlights.forEach(held => {
+                        if (held.isConnected && held.dataset.id) heldIds.push(held.dataset.id);
+                    });
+                    heldHighlights.clear();
+                }
                 pinnedList.innerHTML = '';
                 deadlineList.innerHTML = '';
                 taskList.innerHTML = '';
@@ -10294,15 +10893,22 @@ theme: 'system',
 
                 let addedIds = false;
                 tasks.forEach(task => {
+                    if (!task || typeof task !== 'object' || !task.text) return;
+                    if (!task.id) { task.id = newTaskId(); addedIds = true; }
+                    if (!task.createdAt) task.createdAt = new Date().toISOString();
+                    if (task.completed && !task.completedAt) task.completedAt = new Date().toISOString();
+                });
+                const ordered = applyNoDeadlineOrder(tasks.filter(t => t && typeof t === 'object' && t.text));
+                ordered.forEach(task => {
                     try {
-                        if (!task || typeof task !== 'object' || !task.text) return;
-                        if (!task.id) { task.id = newTaskId(); addedIds = true; }
-                        if (!task.createdAt) task.createdAt = new Date().toISOString();
-                        if (task.completed && !task.completedAt) task.completedAt = new Date().toISOString();
                         const li = createTaskElement(task);
                         if (task.completed) completedList.appendChild(li);
                         else taskList.appendChild(li);
                     } catch (e) { console.error('Пропуск повреждённой задачи при загрузке:', e); }
+                });
+                heldIds.forEach(id => {
+                    const li = document.querySelector('#tasksBlocks li[data-id="' + CSS.escape(id) + '"]:not(.clone-task)');
+                    if (li) { li.classList.add('highlight-hold'); heldHighlights.add(li); }
                 });
                 // старым задачам назначили id — сохраняем обновлённый список
                 if (addedIds) saveTasks();
@@ -10369,10 +10975,15 @@ theme: 'system',
         function cloudSettingsForCloud() {
             const settings = JSON.parse(localStorage.getItem('appSettings') || '{}');
             delete settings.theme;
+            // мёртвая настройка удалена (1.10.23) — вычищаем и из облака
+            delete settings.useRelativeTime;
             delete settings.phoneRemindDeadlines;
             delete settings.phoneRemindDeadlinesMin;
             delete settings.phoneRemindRepeats;
             delete settings.phoneRemindRepeatsMin;
+            // виджет рабочего стола (1.12.0) — тоже локальная настройка
+            delete settings.widgetUpcomingDays;
+            delete settings.widgetTodayFirst;
             return settings;
         }
 
@@ -10434,7 +11045,12 @@ theme: 'system',
             domDirty: false,          // пересборка отложена: правка/отсчёт в полёте
             unsubTasks: null, unsubTrash: null, unsubSettings: null,
             gotTasks: false, gotTrash: false, gotSettings: false,
-            lastServerCheck: 0, lastServerSeen: 0
+            lastServerCheck: 0, lastServerSeen: 0,
+            // операции, отправленные пачкой/по одной, но ещё НЕ подтверждённые
+            // сервером (ключ 'coll/id'): в этом окне сервер держит старое
+            // состояние, и опрос не должен воскрешать удалённое/перезаписывать
+            // свежее локальным-намерением-старым-сервером
+            inflight: new Map()
         };
 
         function syncReset() {
@@ -10443,6 +11059,7 @@ theme: 'system',
             sync.shadowSettings = null;
             sync.queue.length = 0;
             sync.dead.length = 0;
+            sync.inflight.clear();
             sync.lastServerCheck = 0;
             sync.lastServerSeen = 0;
             if (sync.flushTimer) { clearTimeout(sync.flushTimer); sync.flushTimer = null; }
@@ -10451,6 +11068,16 @@ theme: 'system',
             sync.gotTasks = false;
             sync.gotTrash = false;
             sync.gotSettings = false;
+        }
+
+        // есть ли неотправленное (очередь) или отправленное-но-неподтверждённое
+        // (in-flight) либо отложенное в dead-letter локальное намерение
+        // по этому документу — серверные данные по нему устарели по умолчанию
+        function syncHasPendingOp(coll, id) {
+            const key = coll + '/' + id;
+            if (sync.inflight.has(key)) return true;
+            if (sync.queue.some(op => op.coll === coll && op.id === id)) return true;
+            return sync.dead.some(op => op.coll === coll && op.id === id);
         }
 
         // Firestore не хранит undefined и отклоняет такие документы —
@@ -10476,6 +11103,10 @@ theme: 'system',
         // реально изменилось (нужна пересборка DOM). Эхо собственной записи
         // и повторные события «без изменений» отсеиваются сравнением с тенью
         function syncApplyRemote(coll, id, data) {
+            // локальное намерение (в очереди / в полёте / в dead-letter)
+            // главнее сервера: пока наша операция не подтверждена, сервер
+            // держит старое состояние, и опрос воскрешал удалённые задачи
+            if (syncHasPendingOp(coll, id)) return false;
             const key = coll === 'tasks' ? 'myTasks' : 'trashTasks';
             const shadow = coll === 'tasks' ? sync.shadowTasks : sync.shadowTrash;
             const json = data ? cloudStable(data) : null;
@@ -10565,6 +11196,10 @@ theme: 'system',
             const uid = cloud.user.uid;
             while (sync.queue.length) {
                 const chunk = sync.queue.splice(0, 400);
+                // в полёте с момента splice до подтверждения: в этом окне
+                // опрос/watch не должны видеть серверное состояние поверх
+                // локального намерения (syncApplyRemote гвардится inflight)
+                chunk.forEach(op => sync.inflight.set(op.coll + '/' + op.id, op));
                 const batch = cloud.fs.writeBatch(cloud.db);
                 chunk.forEach(op => {
                     if (op.coll === 'settings') {
@@ -10577,11 +11212,13 @@ theme: 'system',
                     else batch.delete(ref);
                 });
                 batch.commit().then(() => {
+                    chunk.forEach(op => sync.inflight.delete(op.coll + '/' + op.id));
                     cloudUpdateStatus(false);
                 }).catch((err) => {
                     console.error('Ошибка записи в Firebase (пачка из ' + chunk.length + '):', err && (err.code || err.message) || err);
                     cloudShowConnError(err);
                     // изоляция: по одной операции, у каждой своя судьба
+                    // (in-flight остаётся до успеха/3 неудач в syncWriteOne)
                     chunk.forEach(op => syncWriteOne(op, uid));
                 });
             }
@@ -10599,6 +11236,7 @@ theme: 'system',
                     : cloud.fs.deleteDoc(ref);
             }
             p.then(() => {
+                sync.inflight.delete(op.coll + '/' + op.id);
                 cloudUpdateStatus(false);
             }).catch((err) => {
                 op.fails = (op.fails || 0) + 1;
@@ -10606,6 +11244,7 @@ theme: 'system',
                 cloudShowConnError(err);
                 if (op.fails >= 3) {
                     sync.dead.push(op);
+                    sync.inflight.delete(op.coll + '/' + op.id);
                     console.error('Операция отложена в dead-letter (3 неудачи) — очередь разблокирована:', op.coll + '/' + op.id);
                 } else {
                     sync.queue.push(op);
@@ -10696,6 +11335,9 @@ theme: 'system',
             cloudRestoreView(anchor);
             // расписание напоминаний обёртки — после любой пересборки списка
             sendNativeReminders();
+            // снимок виджета — тоже: правка с другого устройства должна
+            // доехать до рабочего стола без локальных действий
+            sendWidgetData();
         }
 
         // прямой опрос сервера — страховка на случай, когда watch-поток
@@ -10727,13 +11369,15 @@ theme: 'system',
                 }
                 if (sR.status === 'fulfilled') {
                     sync.gotSettings = true;
-                    if (sR.value.exists()) {
+                    // наша настройочная операция ещё не подтверждена —
+                    // серверные настройки устарели, не затирать локальные
+                    if (sR.value.exists() && !syncHasPendingOp('settings', 'state')) {
                         // настройки: пришедшее объединяется с локальным — тема и
                         // телефонные напоминания остаются локальными
                         const incoming = sR.value.data().settings || {};
                         const local = JSON.parse(localStorage.getItem('appSettings') || '{}');
                         if (typeof local.theme === 'string') incoming.theme = local.theme;
-                        ['phoneRemindDeadlines', 'phoneRemindDeadlinesMin', 'phoneRemindRepeats', 'phoneRemindRepeatsMin'].forEach(k => {
+                        ['phoneRemindDeadlines', 'phoneRemindDeadlinesMin', 'phoneRemindRepeats', 'phoneRemindRepeatsMin', 'widgetUpcomingDays', 'widgetTodayFirst'].forEach(k => {
                             if (local[k] !== undefined) incoming[k] = local[k];
                         });
                         const json = cloudStable(incoming);
@@ -10743,6 +11387,9 @@ theme: 'system',
                             loadSettings();
                             applyTheme();
                             applyTaskFontSize();
+                            // в настройках мог приехать порядок задач без
+                            // дедлайна с другого устройства — пересобрать список
+                            syncScheduleDom();
                         }
                     }
                 } else {
@@ -10797,12 +11444,15 @@ theme: 'system',
                     syncFirstPullCheck();
                 }
                 if (!snap.exists()) return;
+                // настройочная операция в полёте — серверные настройки
+                // устарели (наши локальные новее по намерению)
+                if (syncHasPendingOp('settings', 'state')) return;
                 // настройки: пришедшее объединяется с локальным — тема и
                 // телефонные напоминания остаются локальными
                 const incoming = snap.data().settings || {};
                 const local = JSON.parse(localStorage.getItem('appSettings') || '{}');
                 if (typeof local.theme === 'string') incoming.theme = local.theme;
-                ['phoneRemindDeadlines', 'phoneRemindDeadlinesMin', 'phoneRemindRepeats', 'phoneRemindRepeatsMin'].forEach(k => {
+                ['phoneRemindDeadlines', 'phoneRemindDeadlinesMin', 'phoneRemindRepeats', 'phoneRemindRepeatsMin', 'widgetUpcomingDays', 'widgetTodayFirst'].forEach(k => {
                     if (local[k] !== undefined) incoming[k] = local[k];
                 });
                 const json = cloudStable(incoming);
@@ -10812,6 +11462,9 @@ theme: 'system',
                 loadSettings();
                 applyTheme();
                 applyTaskFontSize();
+                // в настройках мог приехать порядок задач без дедлайна с
+                // другого устройства — пересобрать список
+                syncScheduleDom();
             }, (err) => { console.error('Ошибка подписки настроек:', err); cloudShowConnError(err); });
             // страховка: если watch-поток не доставит первый снапшот,
             // прямой опрос доведёт первую синхронизацию до конца
